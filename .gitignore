@@ -40,3 +40,10 @@ dump.rdb
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local-only: specs / design notes (do not push)
+.kiro/
+docs/
+
+# Backend tests (kept out of repo)
+backend/test_*.py

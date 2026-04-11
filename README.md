@@ -4,7 +4,7 @@ Transform your GitHub footprint into professional resumes and shareable social c
 
 ## Vision
 
-Codefolio helps developers turn public GitHub activity into **resume-ready narratives** and **shareable assets**. The product direction includes deeper **comparison**: not only multi-user GitScore and radar charts, but eventually **repository-level benchmarking**—using observable signals (README quality, topics, releases, activity) plus structured AI output to surface **gaps, actionable tasks, and strategy options**, without promising viral growth. See the design draft for scope, data model, and phased delivery: [`docs/design-compare-repo-growth.md`](docs/design-compare-repo-growth.md).
+Codefolio helps developers turn public GitHub activity into **resume-ready narratives** and **shareable assets**. The product direction includes deeper **comparison**: not only multi-user GitScore and radar charts, but eventually **repository-level benchmarking**—using observable signals (README quality, topics, releases, activity) plus structured AI output to surface **gaps, actionable tasks, and strategy options**, without promising viral growth. Detailed design notes (scope, data model, phased delivery) are kept **locally only** and are not part of this repository.
 
 ## Features
 
@@ -20,7 +20,7 @@ Codefolio helps developers turn public GitHub activity into **resume-ready narra
 
 ### Roadmap (design)
 
-- **Repository benchmark mode**: Compare your repo to peers (same language/topics and similar scale), hypothesis cards with evidence, gap matrix, and prioritized action lists—see [`docs/design-compare-repo-growth.md`](docs/design-compare-repo-growth.md) (database and storage options included).
+- **Repository benchmark mode** (planned): Compare your repo to peers (same language/topics and similar scale), hypothesis cards with evidence, gap matrix, and prioritized action lists; storage options TBD in local design notes.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ Codefolio helps developers turn public GitHub activity into **resume-ready narra
 - **Cache**: Redis 7+
 - **APIs**: GitHub GraphQL API v4, DeepSeek/GPT-4o-mini
 
-Future benchmark features may add **PostgreSQL** (or SQLite for small deployments) for repository snapshots and reports—details in the design doc above.
+Future benchmark features may add **PostgreSQL** (or SQLite for small deployments) for repository snapshots and reports.
 
 ## Setup
 
@@ -138,8 +138,6 @@ codefolio/
 │   └── utils/               # Utility modules
 │       ├── __init__.py
 │       └── redis_client.py  # Redis connection manager
-├── docs/
-│   └── design-compare-repo-growth.md  # Compare & repo benchmark design (draft)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx          # Main React component
