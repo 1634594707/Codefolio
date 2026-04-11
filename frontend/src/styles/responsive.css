@@ -1,0 +1,132 @@
+﻿/* ===== Responsive ===== */
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .export-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .side-nav {
+    display: none;
+  }
+  
+  .main-canvas {
+    margin-left: 0;
+  }
+  
+  .mobile-menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .mobile-menu {
+    display: flex;
+  }
+  
+  .topbar-brand-text {
+    display: none;
+  }
+  
+  .topbar-nav {
+    display: none;
+  }
+  
+  .stats-grid,
+  .export-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .repo-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .compare-user-cards,
+  .compare-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .resume-builder-header {
+    flex-direction: column;
+  }
+  
+  .heatmap-stats {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .trends-insights {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .content-shell {
+    width: calc(100% - 32px);
+    padding: 20px 0 40px;
+  }
+  
+  .topbar {
+    padding: 12px 16px;
+  }
+  
+  .topbar-search {
+    flex: 1;
+  }
+  
+  .search-input-wrapper {
+    display: none;
+  }
+  
+  .content-lang-switch {
+    display: none;
+  }
+  
+  .history-item {
+    flex-wrap: wrap;
+  }
+  
+  .markdown-paper {
+    padding: 20px;
+  }
+  
+  .analysis-card {
+    padding: 16px;
+  }
+  
+  .score-number {
+    font-size: 3rem;
+  }
+  
+  .compare-input-wrapper {
+    flex-direction: column;
+  }
+
+  .repo-card-actions,
+  .resume-builder-actions {
+    flex-direction: column;
+  }
+  
+  .heatmap-grid {
+    gap: 2px;
+  }
+  
+  .heatmap-cell {
+    width: 10px;
+    height: 10px;
+  }
+}

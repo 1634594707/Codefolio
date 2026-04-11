@@ -1,0 +1,41 @@
+﻿:root {
+  --color-primary: #2a6edb;
+  --color-secondary: #6f4bd8;
+  --color-tertiary: #1f9e51;
+  --color-background: #f3f7ff;
+  --color-surface: #edf3ff;
+  --color-surface-container: rgba(255, 255, 255, 0.9);
+  --color-surface-container-low: rgba(245, 248, 255, 0.95);
+  --color-surface-container-high: rgba(255, 255, 255, 0.95);
+  --color-on-surface: #111827;
+  --color-on-surface-variant: #4b5563;
+  --color-outline: rgba(82, 96, 123, 0.24);
+  --color-outline-variant: rgba(82, 96, 123, 0.16);
+  --elev-card-shadow: 0 10px 30px rgba(24, 39, 75, 0.1);
+  --elev-soft-shadow: 0 6px 20px rgba(24, 39, 75, 0.08);
+  --panel-bg: rgba(255, 255, 255, 0.86);
+  --panel-bg-subtle: rgba(255, 255, 255, 0.72);
+  --panel-border-strong: rgba(82, 96, 123, 0.22);
+  --panel-border-soft: rgba(82, 96, 123, 0.14);
+}
+
+.dark {
+  --color-primary: #acc7ff;
+  --color-secondary: #d2bbff;
+  --color-tertiary: #67df70;
+  --color-background: #10141a;
+  --color-surface: #10141a;
+  --color-surface-container: rgba(28, 32, 38, 0.88);
+  --color-surface-container-low: rgba(24, 28, 34, 0.95);
+  --color-surface-container-high: rgba(38, 42, 49, 0.95);
+  --color-on-surface: #dfe2eb;
+  --color-on-surface-variant: #a3a7b2;
+  --color-outline: rgba(143, 144, 149, 0.32);
+  --color-outline-variant: rgba(69, 71, 75, 0.45);
+  --elev-card-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
+  --elev-soft-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  --panel-bg: rgba(28, 32, 38, 0.9);
+  --panel-bg-subtle: rgba(24, 28, 34, 0.82);
+  --panel-border-strong: rgba(69, 71, 75, 0.45);
+  --panel-border-soft: rgba(69, 71, 75, 0.3);
+}

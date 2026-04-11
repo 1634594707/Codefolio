@@ -1,0 +1,247 @@
+﻿/* ===== Contribution Heatmap Styles ===== */
+.contribution-heatmap {
+  background: var(--color-surface-container);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.heatmap-stats {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.heatmap-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heatmap-stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-on-surface);
+}
+
+.heatmap-stat-label {
+  font-size: 0.8rem;
+  color: var(--color-on-surface-variant);
+}
+
+.heatmap-container {
+  overflow-x: auto;
+}
+
+.heatmap-months {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 8px;
+  padding-left: 32px;
+}
+
+.heatmap-month-label {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+  width: 28px;
+  text-align: center;
+}
+
+.heatmap-grid-wrapper {
+  display: flex;
+  gap: 4px;
+}
+
+.heatmap-weekdays {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.heatmap-weekday-label {
+  font-size: 0.7rem;
+  color: var(--color-on-surface-variant);
+  height: 12px;
+  line-height: 12px;
+}
+
+.heatmap-grid {
+  display: flex;
+  gap: 4px;
+}
+
+.heatmap-week {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  transition: all 150ms ease;
+}
+
+.heatmap-cell:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.heatmap-legend span {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+}
+
+.heatmap-legend-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* ===== Skill Trends Styles ===== */
+.skill-trends {
+  background: var(--color-surface-container);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.trends-header {
+  margin-bottom: 24px;
+}
+
+.trends-title {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.trends-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-on-surface-variant);
+}
+
+.trends-insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.trend-insight-card {
+  background: var(--color-surface-container-low);
+  border: 2px solid var(--color-outline-variant);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 200ms ease;
+}
+
+.trend-insight-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elev-soft-shadow);
+}
+
+.trend-insight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.trend-language {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.trend-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.trend-status-growing {
+  background: rgba(31, 158, 81, 0.15);
+  color: #1f9e51;
+}
+
+.trend-status-declining {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.trend-status-stable {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+}
+
+.trend-status-new {
+  background: rgba(42, 110, 219, 0.15);
+  color: #2a6edb;
+}
+
+.trend-insight-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.trend-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trend-stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-on-surface);
+}
+
+.trend-stat-value.trend-up {
+  color: #1f9e51;
+}
+
+.trend-stat-value.trend-down {
+  color: #ef4444;
+}
+
+.trend-stat-label {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+}
+
+.trends-chart-section {
+  margin-bottom: 24px;
+}
+
+.trends-chart-section:last-child {
+  margin-bottom: 0;
+}
+
+.trends-chart-title {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.trends-chart-wrapper {
+  width: 100%;
+}
