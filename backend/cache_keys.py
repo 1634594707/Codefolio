@@ -5,6 +5,7 @@ GitHubService, AIService, and cache invalidation (e.g. DELETE /api/cache/{userna
 
 GITHUB_USER_CACHE_VERSION = "v4"
 REPOSITORY_ANALYSIS_CACHE_VERSION = "v2"
+REPOSITORY_PROFILE_CACHE_VERSION = "v1"
 
 
 def github_user_cache_key(username: str) -> str:
@@ -42,3 +43,29 @@ def repository_analysis_cache_key(username: str, repo_name: str, language: str) 
 
 def repository_analysis_cache_prefix(username: str) -> str:
     return f"ai:{username}:repo-analysis:"
+
+
+def repository_profile_cache_key(full_name: str) -> str:
+    normalized = full_name.strip().lower()
+    return f"github:repo:{REPOSITORY_PROFILE_CACHE_VERSION}:{normalized}"
+
+
+def benchmark_cache_key(
+    mine: str,
+    benchmarks: list[str],
+    language: str = "en",
+    include_narrative: bool = False,
+) -> str:
+    """Generate cache key for benchmark analysis results."""
+    import hashlib
+    mine_hash = hashlib.md5(mine.strip().lower().encode()).hexdigest()[:8]
+    bench_hash = hashlib.md5(",".join(sorted(item.strip().lower() for item in benchmarks)).encode()).hexdigest()[:8]
+    narrative_flag = "n1" if include_narrative else "n0"
+    return f"benchmark:v2:{mine_hash}:{bench_hash}:{language}:{narrative_flag}"
+
+
+def suggestion_cache_key(repo: str, limit: int) -> str:
+    """Generate cache key for benchmark suggestions."""
+    import hashlib
+    repo_hash = hashlib.md5(repo.encode()).hexdigest()[:8]
+    return f"suggestions:v1:{repo_hash}:{limit}"

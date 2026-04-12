@@ -11,10 +11,11 @@ from pydantic import BaseModel, Field
 
 from cache_keys import ai_cache_keys_to_clear, github_user_cache_keys_to_clear, repository_analysis_cache_prefix
 from config import settings
+from routers import repos_benchmark
 from services.ai_service import AIService
 from services.github_service import GitHubService
-from services.render_service import RenderService
 from services.language_trends import compute_language_trends
+from services.render_service import RenderService
 from services.score_engine import ScoreEngine
 from utils.redis_client import redis_client
 
@@ -55,6 +56,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(repos_benchmark.router)
 
 github_service = GitHubService()
 score_engine = ScoreEngine()
@@ -99,13 +102,13 @@ def map_exception_to_http(error: Exception) -> HTTPException:
     payload = GitHubService.create_error_response(error)
     status_code = 500
 
-    if payload["error_type"] in {"invalid_input"}:
+    if payload["error_type"] == "invalid_input":
         status_code = 400
-    elif payload["error_type"] in {"user_not_found"}:
+    elif payload["error_type"] == "user_not_found":
         status_code = 404
-    elif payload["error_type"] in {"rate_limit_exceeded"}:
+    elif payload["error_type"] == "rate_limit_exceeded":
         status_code = 429
-    elif payload["error_type"] in {"timeout_error"}:
+    elif payload["error_type"] == "timeout_error":
         status_code = 503
 
     return HTTPException(
@@ -178,7 +181,7 @@ async def build_generation_payload(username: str, language: str, include_all_lan
     }
     primary_output = localized_outputs[language]
 
-    payload = {
+    return {
         "user": asdict(user_data),
         "gitscore": asdict(gitscore),
         "resume_markdown": primary_output["resume_markdown"],
@@ -189,12 +192,10 @@ async def build_generation_payload(username: str, language: str, include_all_lan
         "available_content_languages": list(localized_outputs.keys()),
         "language_trends": compute_language_trends(user_data, locale=language),
     }
-    return payload
 
 
 @app.get("/api/health")
 async def health_check():
-    """健康检查；可据此确认 .env 是否加载、AI 是否已配置。"""
     return {
         "status": "healthy",
         "service": "codefolio-api",
@@ -257,9 +258,6 @@ async def generate_profile(request: GenerateRequestModel):
     except HTTPException:
         raise
     except Exception as error:
-        import traceback
-        print(f"Error in generate_profile: {error}")
-        print(traceback.format_exc())
         raise map_exception_to_http(error) from error
 
 
@@ -292,7 +290,6 @@ async def export_pdf(
 
 @app.delete("/api/cache/{username}")
 async def clear_user_cache(username: str):
-    """Clear all cached data for a specific user."""
     sanitized_username = sanitize_username(username)
     try:
         keys_to_clear = github_user_cache_keys_to_clear(sanitized_username) + ai_cache_keys_to_clear(
@@ -315,8 +312,8 @@ async def clear_user_cache(username: str):
             status_code=500,
             detail={
                 "code": "cache_clear_error",
-                "message": f"Failed to clear cache: {str(error)}"
-            }
+                "message": f"Failed to clear cache: {str(error)}",
+            },
         )
 
 

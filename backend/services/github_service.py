@@ -1,14 +1,17 @@
 """
 GitHub Service Module
 """
+import asyncio
+import base64
 import httpx
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Dict, Any
 from models import ContributionDay, Contributions, Repository, UserData
 from config import settings
 from utils.redis_client import redis_client
-from cache_keys import github_user_cache_key, github_user_cache_keys_to_clear
+from cache_keys import github_user_cache_key, github_user_cache_keys_to_clear, repository_profile_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +61,81 @@ class GitHubService:
     
     def __init__(self):
         self.api_url = "https://api.github.com/graphql"
+        self.rest_api_url = "https://api.github.com"
         self.headers = {
             "Authorization": f"Bearer {settings.GITHUB_TOKEN}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github+json",
         }
+
+    async def fetch_repository_profile(self, full_name: str) -> Dict[str, Any]:
+        normalized_full_name = full_name.strip().lower()
+        cache_key = repository_profile_cache_key(normalized_full_name)
+        cached_data = await redis_client.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for repository: {normalized_full_name}")
+            return cached_data
+
+        owner, repo = normalized_full_name.split("/", 1)
+        logger.info(f"Cache miss for repository: {normalized_full_name}, fetching from GitHub API")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                repo_response, root_response, workflows_response, issue_templates_response, readme_response = await asyncio.gather(
+                    client.get(f"{self.rest_api_url}/repos/{owner}/{repo}", headers=self.headers),
+                    client.get(f"{self.rest_api_url}/repos/{owner}/{repo}/contents", headers=self.headers),
+                    client.get(f"{self.rest_api_url}/repos/{owner}/{repo}/contents/.github/workflows", headers=self.headers),
+                    client.get(f"{self.rest_api_url}/repos/{owner}/{repo}/contents/.github/ISSUE_TEMPLATE", headers=self.headers),
+                    client.get(f"{self.rest_api_url}/repos/{owner}/{repo}/readme", headers=self.headers),
+                )
+
+                repo_response.raise_for_status()
+                repo_payload = repo_response.json()
+
+                root_entries = root_response.json() if root_response.status_code == 200 else []
+                workflow_entries = workflows_response.json() if workflows_response.status_code == 200 else []
+                issue_template_entries = issue_templates_response.json() if issue_templates_response.status_code == 200 else []
+                readme_payload = readme_response.json() if readme_response.status_code == 200 else None
+
+                profile = self._normalize_repository_profile(
+                    repo_payload=repo_payload,
+                    root_entries=root_entries if isinstance(root_entries, list) else [],
+                    workflow_entries=workflow_entries if isinstance(workflow_entries, list) else [],
+                    issue_template_entries=issue_template_entries if isinstance(issue_template_entries, list) else [],
+                    readme_payload=readme_payload if isinstance(readme_payload, dict) else None,
+                )
+                await redis_client.set(cache_key, profile, settings.GITHUB_CACHE_TTL)
+                return profile
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    raise ValueError(
+                        f"GitHub repository '{normalized_full_name}' not found. "
+                        f"Please check the repository name and try again."
+                    )
+                if e.response.status_code == 401:
+                    raise RuntimeError(
+                        "GitHub API authentication failed. "
+                        "Invalid or missing GitHub token. "
+                        "Please check GITHUB_TOKEN configuration."
+                    )
+                if e.response.status_code == 403:
+                    raise RuntimeError(
+                        "GitHub API rate limit exceeded. "
+                        "Please try again later or use authentication to increase limits."
+                    )
+                raise RuntimeError(
+                    f"GitHub API request failed with status {e.response.status_code}: {e.response.text}"
+                )
+            except httpx.TimeoutException:
+                raise RuntimeError(
+                    "GitHub API request timed out after 30 seconds. "
+                    "Please check your network connection and try again."
+                )
+            except (ValueError, RuntimeError):
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error fetching repository data: {e}")
+                raise RuntimeError(f"Failed to fetch GitHub repository data: {str(e)}")
     
     async def fetch_user_data(self, username: str) -> UserData:
         """
@@ -666,6 +740,213 @@ class GitHubService:
                 add_entry(prefix, entry.get("name", ""), entry.get("type", "blob"))
 
         return entries[:40]
+
+    def _normalize_repository_profile(
+        self,
+        repo_payload: Dict[str, Any],
+        root_entries: list[Dict[str, Any]],
+        workflow_entries: list[Dict[str, Any]],
+        issue_template_entries: list[Dict[str, Any]],
+        readme_payload: Dict[str, Any] | None,
+    ) -> Dict[str, Any]:
+        full_name = str(repo_payload.get("full_name", "")).lower()
+        license_info = repo_payload.get("license") or {}
+        topics = repo_payload.get("topics") or []
+        description = repo_payload.get("description") or ""
+        primary_language = None
+        if isinstance(repo_payload.get("language"), str) and repo_payload.get("language"):
+            primary_language = repo_payload.get("language")
+
+        root_tree: list[str] = []
+        has_contributing = False
+        has_code_of_conduct = False
+        has_security_policy = False
+        has_examples_dir = False
+        has_docs_dir = False
+        has_issue_templates = False
+
+        for entry in root_entries[:20]:
+            name = str(entry.get("name", ""))
+            entry_type = str(entry.get("type", "file"))
+            path = f"{name}{'/' if entry_type == 'dir' else ''}"
+            if name:
+                root_tree.append(path)
+            lowered = name.lower()
+            has_contributing = has_contributing or lowered.startswith("contributing")
+            has_code_of_conduct = has_code_of_conduct or lowered in {"code_of_conduct.md", "code-of-conduct.md"}
+            has_security_policy = has_security_policy or lowered.startswith("security")
+            has_examples_dir = has_examples_dir or lowered == "examples"
+            has_docs_dir = has_docs_dir or lowered == "docs"
+        
+        # Check for issue templates in .github/ISSUE_TEMPLATE/
+        # Issue templates can be .md, .yml, or .yaml files
+        if issue_template_entries:
+            for entry in issue_template_entries:
+                name = str(entry.get("name", "")).lower()
+                if name.endswith(('.md', '.yml', '.yaml')):
+                    has_issue_templates = True
+                    break
+
+        readme_text = self._decode_rest_readme_text(readme_payload)
+        readme_sections = self._extract_readme_headings(readme_text)
+        readme_structure = self._extract_readme_structure(readme_text)
+        has_screenshot = readme_structure["has_images"]
+        quickstart_signals = ("install", "quick start", "quickstart", "getting started", "usage", "run")
+        has_quickstart = any(any(signal in heading.lower() for signal in quickstart_signals) for heading in readme_sections)
+
+        profile = {
+            "full_name": full_name,
+            "description": description,
+            "stars": int(repo_payload.get("stargazers_count") or 0),
+            "forks": int(repo_payload.get("forks_count") or 0),
+            "language": primary_language,
+            "topics": [str(topic) for topic in topics][:10],
+            "license": license_info.get("spdx_id") or license_info.get("name"),
+            "default_branch": repo_payload.get("default_branch"),
+            "created_at": repo_payload.get("created_at"),
+            "pushed_at": repo_payload.get("pushed_at"),
+            "has_readme": bool(readme_text),
+            "readme_sections": readme_sections,
+            "has_license_file": bool(license_info),
+            "workflow_file_count": len(workflow_entries),
+            "has_contributing": has_contributing,
+            "has_code_of_conduct": has_code_of_conduct,
+            "has_security_policy": has_security_policy,
+            "has_issue_templates": has_issue_templates,
+            "root_tree": root_tree,
+            "readme_excerpt": readme_text,
+            "has_screenshot": has_screenshot,
+            "has_quickstart": has_quickstart,
+            "has_examples_dir": has_examples_dir,
+            "has_docs_dir": has_docs_dir,
+            "homepage": repo_payload.get("homepage"),
+            "open_issues_count": int(repo_payload.get("open_issues_count") or 0),
+            "archived": bool(repo_payload.get("archived")),
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            # README structure for first_impression analysis
+            "readme_h2_sections": readme_structure["h2_sections"],
+            "readme_image_count": readme_structure["image_count"],
+            "readme_badge_count": readme_structure["badge_count"],
+            "readme_has_toc": readme_structure["has_toc"],
+        }
+        return profile
+
+    def _decode_rest_readme_text(self, readme_payload: Dict[str, Any] | None) -> str:
+        if not readme_payload:
+            return ""
+        if isinstance(readme_payload.get("content"), str):
+            try:
+                decoded = base64.b64decode(readme_payload["content"]).decode("utf-8", errors="ignore")
+                return self._sanitize_readme_text(decoded)
+            except Exception:
+                return ""
+        return ""
+
+    def _extract_readme_headings(self, readme_text: str) -> list[str]:
+        headings: list[str] = []
+        for line in readme_text.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("#"):
+                continue
+            heading = stripped.lstrip("#").strip()
+            if heading:
+                headings.append(heading)
+            if len(headings) >= 8:
+                break
+        return headings
+    
+    def _extract_readme_structure(self, readme_text: str) -> Dict[str, Any]:
+        """
+        Extract detailed README structure for first_impression analysis.
+        
+        Extracts:
+        - Section headings (## level specifically)
+        - Images/GIFs in README content
+        - Badge count (shields.io, travis-ci, etc.)
+        - Table of contents detection
+        
+        Args:
+            readme_text: Raw README markdown content
+            
+        Returns:
+            Dictionary with structure information:
+            {
+                "h2_sections": list[str],  # ## level headings
+                "has_images": bool,
+                "image_count": int,
+                "badge_count": int,
+                "has_toc": bool
+            }
+        """
+        if not readme_text:
+            return {
+                "h2_sections": [],
+                "has_images": False,
+                "image_count": 0,
+                "badge_count": 0,
+                "has_toc": False
+            }
+        
+        lines = readme_text.splitlines()
+        h2_sections = []
+        badge_count = 0
+        image_count = 0
+        has_toc = False
+        
+        # Track if we're in a potential TOC section
+        in_toc_section = False
+        toc_list_items = 0
+        
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            
+            # Extract ## level headings (h2)
+            if stripped.startswith("## "):
+                heading = stripped[3:].strip()
+                if heading:
+                    h2_sections.append(heading)
+                    
+                    # Check if this heading indicates a TOC
+                    if TOC_HEADING_PATTERN.match(heading):
+                        in_toc_section = True
+                        toc_list_items = 0
+            
+            # Count badges (lines with multiple badge-style links)
+            # Badges typically appear as: [![text](image-url)](link-url)
+            if "shields.io" in stripped or "travis-ci" in stripped or "badge" in stripped.lower():
+                # Count individual badge patterns in the line
+                badge_matches = re.findall(r'\[!\[[^\]]*\]\([^)]+\)\]\([^)]+\)', stripped)
+                badge_count += len(badge_matches)
+                
+                # Also count standalone badge images
+                if not badge_matches:
+                    standalone_badges = re.findall(r'!\[[^\]]*badge[^\]]*\]\([^)]+\)', stripped, re.IGNORECASE)
+                    badge_count += len(standalone_badges)
+            
+            # Detect TOC list items (links with # anchors)
+            if in_toc_section and TOC_LIST_ITEM_PATTERN.match(stripped):
+                toc_list_items += 1
+                # If we have 3+ list items with anchor links, it's likely a TOC
+                if toc_list_items >= 3:
+                    has_toc = True
+                    in_toc_section = False  # Stop looking once confirmed
+            elif in_toc_section and stripped and not stripped.startswith(("#", "-", "*", "+")):
+                # Reset if we hit non-list content
+                in_toc_section = False
+                toc_list_items = 0
+        
+        # Count images (both markdown and HTML)
+        markdown_images = MARKDOWN_IMAGE_PATTERN.findall(readme_text)
+        html_images = HTML_IMAGE_PATTERN.findall(readme_text)
+        image_count = len(markdown_images) + len(html_images)
+        
+        return {
+            "h2_sections": h2_sections[:20],  # Limit to first 20 h2 sections
+            "has_images": image_count > 0,
+            "image_count": image_count,
+            "badge_count": badge_count,
+            "has_toc": has_toc
+        }
     
     def _calculate_longest_streak(self, calendar: Dict[str, Any]) -> int:
         """

@@ -157,7 +157,7 @@ function getRepositoryResumeScore(repo: RepositoryItem): number {
   return community + docs + topics + structure + description
 }
 
-function getCandidateSignals(repo: RepositoryItem, language: 'en' | 'zh'): string[] {
+export function getCandidateSignals(repo: RepositoryItem, language: 'en' | 'zh'): string[] {
   const signals: string[] = []
 
   if (repo.has_readme) signals.push(language === 'zh' ? 'README 完整' : 'README ready')

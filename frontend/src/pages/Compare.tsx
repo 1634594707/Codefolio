@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
   BarChart,
@@ -59,11 +59,11 @@ const dimensionKeys: DimensionKey[] = [
 const labels = {
   en: {
     title: 'Compare Developers',
-    subtitle: 'Side-by-side comparison',
+    subtitle: 'Side-by-side profile comparison',
+    tabsUsers: 'Developers',
+    tabsRepos: 'Repositories',
     addUser: 'Add User',
-    compare: 'Compare',
     remove: 'Remove',
-    gitscore: 'GitScore',
     comparisonInsights: 'Comparison Insights',
     overallLeader: 'Overall Leader',
     strongestEdge: 'Strongest Edge',
@@ -87,22 +87,20 @@ const labels = {
     following: 'Following',
     repos: 'Repositories',
     stars: 'Total Stars',
-    tags: 'Style Tags',
-    summary: 'AI Summary',
-    roast: 'Roast',
-    languageDistribution: 'Language Distribution',
     loading: 'Loading...',
     error: 'Failed to load',
     empty: 'Add GitHub usernames to compare',
+    invalidInput: 'Use GitHub usernames or profile links only.',
+    partialFailure: 'Some users could not be loaded',
     maxUsers: 'Maximum 3 users',
   },
   zh: {
     title: '开发者对比',
-    subtitle: '并排对比分析',
+    subtitle: '并排查看 GitHub 用户画像',
+    tabsUsers: '开发者',
+    tabsRepos: '仓库对标',
     addUser: '添加用户',
-    compare: '对比',
     remove: '移除',
-    gitscore: 'GitScore',
     comparisonInsights: '对比结论',
     overallLeader: '当前领先者',
     strongestEdge: '最强优势',
@@ -126,15 +124,28 @@ const labels = {
     following: '正在关注',
     repos: '仓库数',
     stars: '总星标',
-    tags: '风格标签',
-    summary: 'AI 总结',
-    roast: 'AI 点评',
-    languageDistribution: '语言分布',
     loading: '加载中...',
     error: '加载失败',
     empty: '添加 GitHub 用户名进行对比',
+    invalidInput: '请输入 GitHub 用户名或主页链接。',
+    partialFailure: '以下用户加载失败',
     maxUsers: '最多 3 个用户',
   },
+} as const
+
+function CompareModeTabs({ language }: CompareProps) {
+  const text = labels[language]
+
+  return (
+    <div className="compare-mode-tabs" role="tablist" aria-label={text.title}>
+      <Link to="/compare/users" className="compare-mode-tab compare-mode-tab-active">
+        {text.tabsUsers}
+      </Link>
+      <Link to="/compare/repos" className="compare-mode-tab">
+        {text.tabsRepos}
+      </Link>
+    </div>
+  )
 }
 
 export function Compare({ language }: CompareProps) {
@@ -155,10 +166,6 @@ export function Compare({ language }: CompareProps) {
   const [inputError, setInputError] = useState('')
   const [failedUsers, setFailedUsers] = useState<string[]>([])
   const text = labels[language]
-  const invalidInputText =
-    language === 'zh' ? '请输入 GitHub 用户名、@用户名或 GitHub 链接。' : 'Use GitHub usernames or profile links only.'
-  const partialFailureText =
-    language === 'zh' ? '以下用户加载失败' : 'Some users could not be loaded'
 
   useEffect(() => {
     const urlUsers = splitGitHubUsernameInputs(searchParams.get('users') ?? '')
@@ -229,7 +236,7 @@ export function Compare({ language }: CompareProps) {
               following: data.user.following,
               repositories_count: data.user.repositories.length,
               total_stars: data.user.repositories.reduce(
-                (sum: number, r: { stars: number }) => sum + r.stars,
+                (sum: number, repository: { stars: number }) => sum + repository.stars,
                 0,
               ),
               languages: data.user.languages,
@@ -250,8 +257,8 @@ export function Compare({ language }: CompareProps) {
         if (fulfilledUsers.length === 0 && rejectedUsers.length > 0) {
           setError(text.error)
         }
-      } catch (err) {
-        if (isRequestAborted(err) || cancelled) return
+      } catch (requestError) {
+        if (isRequestAborted(requestError) || cancelled) return
         setError(text.error)
       } finally {
         if (!cancelled) setLoading(false)
@@ -267,7 +274,14 @@ export function Compare({ language }: CompareProps) {
 
   const addUser = () => {
     const candidates = splitGitHubUsernameInputs(inputValue)
-    if (candidates.length === 0 || usernames.length >= 3) return
+    if (candidates.length === 0) {
+      setInputError(text.invalidInput)
+      return
+    }
+    if (usernames.length >= 3) {
+      setInputError(text.maxUsers)
+      return
+    }
 
     const validCandidates = candidates
       .map((candidate) => validateGitHubUsername(candidate))
@@ -275,7 +289,7 @@ export function Compare({ language }: CompareProps) {
       .map((item) => item.username)
 
     if (validCandidates.length === 0) {
-      setInputError(invalidInputText)
+      setInputError(text.invalidInput)
       return
     }
 
@@ -287,32 +301,55 @@ export function Compare({ language }: CompareProps) {
       mergedUsernames.push(candidate)
     }
 
-    setSearchParams({ users: mergedUsernames.join(',') })
+    if (mergedUsernames.length > 0) {
+      setSearchParams({ users: mergedUsernames.join(',') })
+    }
     setInputValue('')
     setInputError('')
   }
 
   const removeUser = (username: string) => {
     removeFromCompare(username)
-    const newUsernames = usernames.filter((u) => u !== username)
-    if (newUsernames.length > 0) setSearchParams({ users: newUsernames.join(',') })
-    else setSearchParams({})
+    const nextUsernames = usernames.filter((user) => user !== username)
+    if (nextUsernames.length > 0) {
+      setSearchParams({ users: nextUsernames.join(',') })
+    } else {
+      setSearchParams({})
+    }
   }
 
   const radarData = [
-    { subject: text.dimensions.impact, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.impact])) },
-    { subject: text.dimensions.contribution, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.contribution])) },
-    { subject: text.dimensions.community, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.community])) },
-    { subject: text.dimensions.breadth, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.tech_breadth])) },
-    { subject: text.dimensions.documentation, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.documentation])) },
+    { subject: text.dimensions.impact, ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.impact])) },
+    {
+      subject: text.dimensions.contribution,
+      ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.contribution])),
+    },
+    { subject: text.dimensions.community, ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.community])) },
+    {
+      subject: text.dimensions.breadth,
+      ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.tech_breadth])),
+    },
+    {
+      subject: text.dimensions.documentation,
+      ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.documentation])),
+    },
   ]
 
   const barData = [
-    { name: text.dimensions.impact, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.impact])) },
-    { name: text.dimensions.contribution, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.contribution])) },
-    { name: text.dimensions.community, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.community])) },
-    { name: text.dimensions.breadth, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.tech_breadth])) },
-    { name: text.dimensions.documentation, ...Object.fromEntries(users.map((u) => [u.username, u.dimensions.documentation])) },
+    { name: text.dimensions.impact, ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.impact])) },
+    {
+      name: text.dimensions.contribution,
+      ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.contribution])),
+    },
+    { name: text.dimensions.community, ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.community])) },
+    {
+      name: text.dimensions.breadth,
+      ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.tech_breadth])),
+    },
+    {
+      name: text.dimensions.documentation,
+      ...Object.fromEntries(users.map((user) => [user.username, user.dimensions.documentation])),
+    },
   ]
 
   const statsData = users.map((user) => ({
@@ -324,7 +361,7 @@ export function Compare({ language }: CompareProps) {
     stars: user.total_stars,
   }))
 
-  const colors = ['#2a6edb', '#6f4bd8', '#1f9e51']
+  const colors = ['#0f766e', '#c2410c', '#1d4ed8']
 
   const compareInsights = useMemo(() => {
     if (users.length === 0) return null
@@ -385,78 +422,37 @@ export function Compare({ language }: CompareProps) {
       strongestByUser,
       topStrengthsByUser,
     }
-  }, [
-    users,
-    text.dimensions.impact,
-    text.dimensions.contribution,
-    text.dimensions.community,
-    text.dimensions.breadth,
-    text.dimensions.documentation,
-  ])
-
-  if (usernames.length === 0) {
-    return (
-      <div className="page-container">
-        <div className="page-header">
-          <h1 className="page-title">{text.title}</h1>
-          <p className="page-subtitle">{text.subtitle}</p>
-        </div>
-
-        <div className="compare-input-section">
-          <div className="compare-input-wrapper">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value)
-                if (inputError) setInputError('')
-              }}
-              placeholder={text.addUser}
-              className="compare-input"
-              onKeyDown={(e) => e.key === 'Enter' && addUser()}
-            />
-            <button className="compare-add-btn" onClick={addUser} disabled={usernames.length >= 3}>
-              {text.addUser}
-            </button>
-          </div>
-          {inputError && <p className="compare-hint">{inputError}</p>}
-          <p className="compare-hint">{text.empty}</p>
-        </div>
-      </div>
-    )
-  }
+  }, [users, text])
 
   return (
     <div className="page-container">
       <div className="page-header">
         <h1 className="page-title">{text.title}</h1>
-        <div className="compare-input-wrapper">
-          {usernames.length < 3 && (
-            <>
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => {
-                  setInputValue(e.target.value)
-                  if (inputError) setInputError('')
-                }}
-                placeholder={text.addUser}
-                className="compare-input"
-                onKeyDown={(e) => e.key === 'Enter' && addUser()}
-              />
-              <button className="compare-add-btn" onClick={addUser}>
-                {text.addUser}
-              </button>
-            </>
-          )}
-        </div>
+        <p className="page-subtitle">{text.subtitle}</p>
       </div>
 
-      {inputError && (
-        <div className="error-state">
-          <p>{inputError}</p>
+      <CompareModeTabs language={language} />
+
+      <div className="compare-input-section">
+        <div className="compare-input-wrapper">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(event) => {
+              setInputValue(event.target.value)
+              if (inputError) setInputError('')
+            }}
+            placeholder={text.addUser}
+            className="compare-input"
+            onKeyDown={(event) => event.key === 'Enter' && addUser()}
+          />
+          <button className="compare-add-btn" onClick={addUser} disabled={usernames.length >= 3}>
+            {text.addUser}
+          </button>
         </div>
-      )}
+        {inputError && <p className="compare-hint">{inputError}</p>}
+        {usernames.length === 0 && <p className="compare-hint">{text.empty}</p>}
+      </div>
 
       {loading && (
         <div className="loading-state">
@@ -472,60 +468,58 @@ export function Compare({ language }: CompareProps) {
 
       {!loading && failedUsers.length > 0 && (
         <div className="error-state">
-          <p>{`${partialFailureText}: ${failedUsers.map((user) => `@${user}`).join(', ')}`}</p>
+          <p>{`${text.partialFailure}: ${failedUsers.map((user) => `@${user}`).join(', ')}`}</p>
         </div>
       )}
 
-      {!loading && users.length > 0 && (
+      {!loading && users.length > 0 && compareInsights && (
         <>
-          {compareInsights && (
-            <section className="compare-insights-grid">
-              <article className="compare-insight-card">
-                <span className="compare-insight-kicker">{text.overallLeader}</span>
-                <div className="compare-insight-main">
-                  <strong>@{compareInsights.leader.username}</strong>
-                  <span>{compareInsights.leader.gitscore.toFixed(0)} GitScore</span>
-                </div>
-                <p className="compare-insight-body">
-                  {compareInsights.runnerUp
-                    ? `${text.leadBy} ${compareInsights.leadMargin.toFixed(1)} ${text.points}`
-                    : text.tiedMatch}
-                </p>
-              </article>
+          <section className="compare-insights-grid">
+            <article className="compare-insight-card">
+              <span className="compare-insight-kicker">{text.overallLeader}</span>
+              <div className="compare-insight-main">
+                <strong>@{compareInsights.leader.username}</strong>
+                <span>{compareInsights.leader.gitscore.toFixed(0)} GitScore</span>
+              </div>
+              <p className="compare-insight-body">
+                {compareInsights.runnerUp
+                  ? `${text.leadBy} ${compareInsights.leadMargin.toFixed(1)} ${text.points}`
+                  : text.tiedMatch}
+              </p>
+            </article>
 
-              <article className="compare-insight-card">
-                <span className="compare-insight-kicker">{text.strongestEdge}</span>
-                <div className="compare-insight-main">
-                  <strong>@{compareInsights.dominantDimension.winner.username}</strong>
-                  <span>{compareInsights.dominantDimension.label}</span>
-                </div>
-                <p className="compare-insight-body">
-                  {text.edgeSummary} {compareInsights.dominantDimension.label.toLowerCase()}
-                </p>
-              </article>
+            <article className="compare-insight-card">
+              <span className="compare-insight-kicker">{text.strongestEdge}</span>
+              <div className="compare-insight-main">
+                <strong>@{compareInsights.dominantDimension.winner.username}</strong>
+                <span>{compareInsights.dominantDimension.label}</span>
+              </div>
+              <p className="compare-insight-body">
+                {text.edgeSummary} {compareInsights.dominantDimension.label.toLowerCase()}
+              </p>
+            </article>
 
-              <article className="compare-insight-card">
-                <span className="compare-insight-kicker">{text.closeChallenger}</span>
-                <div className="compare-insight-main">
-                  <strong>
-                    {compareInsights.runnerUp
-                      ? `@${compareInsights.runnerUp.username}`
-                      : `@${compareInsights.leader.username}`}
-                  </strong>
-                  <span>
-                    {compareInsights.runnerUp
-                      ? `${compareInsights.runnerUp.gitscore.toFixed(0)} GitScore`
-                      : text.tiedMatch}
-                  </span>
-                </div>
-                <p className="compare-insight-body">
+            <article className="compare-insight-card">
+              <span className="compare-insight-kicker">{text.closeChallenger}</span>
+              <div className="compare-insight-main">
+                <strong>
                   {compareInsights.runnerUp
-                    ? `${text.leadBy} ${compareInsights.leadMargin.toFixed(1)} ${text.points}`
+                    ? `@${compareInsights.runnerUp.username}`
+                    : `@${compareInsights.leader.username}`}
+                </strong>
+                <span>
+                  {compareInsights.runnerUp
+                    ? `${compareInsights.runnerUp.gitscore.toFixed(0)} GitScore`
                     : text.tiedMatch}
-                </p>
-              </article>
-            </section>
-          )}
+                </span>
+              </div>
+              <p className="compare-insight-body">
+                {compareInsights.runnerUp
+                  ? `${text.leadBy} ${compareInsights.leadMargin.toFixed(1)} ${text.points}`
+                  : text.tiedMatch}
+              </p>
+            </article>
+          </section>
 
           <div className="compare-user-cards">
             {users.map((user, index) => (
@@ -544,36 +538,26 @@ export function Compare({ language }: CompareProps) {
                 </div>
                 <div className="compare-tags">
                   {user.style_tags.slice(0, 3).map((tag) => (
-                    <span
-                      key={tag}
-                      className="compare-tag"
-                      style={{ background: colors[index] + '20', color: colors[index] }}
-                    >
+                    <span key={tag} className="compare-tag" style={{ background: `${colors[index]}18`, color: colors[index] }}>
                       {tag}
                     </span>
                   ))}
                 </div>
-                {compareInsights && (
-                  <div className="compare-advantage-grid">
-                    <div className="compare-advantage-card">
-                      <span className="compare-advantage-label">{text.strongestDimension}</span>
-                      <strong>{compareInsights.strongestByUser.get(user.username)}</strong>
-                    </div>
-                    <div className="compare-advantage-card">
-                      <span className="compare-advantage-label">{text.dimensionWins}</span>
-                      <strong>{compareInsights.winsByUser.get(user.username) ?? 0}</strong>
-                    </div>
+                <div className="compare-advantage-grid">
+                  <div className="compare-advantage-card">
+                    <span className="compare-advantage-label">{text.strongestDimension}</span>
+                    <strong>{compareInsights.strongestByUser.get(user.username)}</strong>
                   </div>
-                )}
-                {compareInsights && (
-                  <p className="compare-strengths">
-                    {text.topStrengths}: {(compareInsights.topStrengthsByUser.get(user.username) ?? []).join(' · ')}
-                  </p>
-                )}
+                  <div className="compare-advantage-card">
+                    <span className="compare-advantage-label">{text.dimensionWins}</span>
+                    <strong>{compareInsights.winsByUser.get(user.username) ?? 0}</strong>
+                  </div>
+                </div>
+                <p className="compare-strengths">
+                  {text.topStrengths}: {(compareInsights.topStrengthsByUser.get(user.username) ?? []).join(' / ')}
+                </p>
                 <p className="compare-summary">{user.tech_summary}</p>
-                {user.roast_comment && (
-                  <blockquote className="compare-roast">"{user.roast_comment}"</blockquote>
-                )}
+                {user.roast_comment && <blockquote className="compare-roast">"{user.roast_comment}"</blockquote>}
               </div>
             ))}
           </div>
@@ -605,11 +589,9 @@ export function Compare({ language }: CompareProps) {
           </div>
 
           <div className="compare-chart-section">
-            <h3 className="compare-chart-title">
-              {text.dimensions.impact} vs {text.dimensions.contribution} vs {text.dimensions.community}
-            </h3>
+            <h3 className="compare-chart-title">{text.stats}</h3>
             <div className="compare-bar-wrapper">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={barData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" />
                   <XAxis dataKey="name" tick={{ fill: 'var(--color-on-surface-variant)', fontSize: 12 }} />
@@ -630,7 +612,6 @@ export function Compare({ language }: CompareProps) {
           </div>
 
           <div className="compare-stats-section">
-            <h3 className="compare-chart-title">{text.stats}</h3>
             <div className="compare-stats-grid">
               {statsData.map((stat, index) => (
                 <div key={stat.username} className="compare-stat-card" style={{ borderColor: colors[index] }}>
@@ -638,7 +619,7 @@ export function Compare({ language }: CompareProps) {
                     @{stat.username}
                   </div>
                   <div className="compare-stat-row">
-                    <span>{text.gitscore}</span>
+                    <span>GitScore</span>
                     <strong>{stat.gitscore.toFixed(0)}</strong>
                   </div>
                   <div className="compare-stat-row">
@@ -659,38 +640,6 @@ export function Compare({ language }: CompareProps) {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div className="compare-lang-section">
-            <h3 className="compare-chart-title">{text.languageDistribution}</h3>
-            <div className="compare-lang-grid">
-              {users.map((user, index) => {
-                const total = Object.values(user.languages).reduce((a, b) => a + b, 0)
-                const sorted = Object.entries(user.languages)
-                  .sort((a, b) => b[1] - a[1])
-                  .slice(0, 5)
-                return (
-                  <div key={user.username} className="compare-lang-card">
-                    <h4 style={{ color: colors[index] }}>@{user.username}</h4>
-                    {sorted.map(([lang, bytes]) => (
-                      <div key={lang} className="compare-lang-row">
-                        <span>{lang}</span>
-                        <div className="compare-lang-bar">
-                          <div
-                            className="compare-lang-fill"
-                            style={{
-                              width: `${total > 0 ? (bytes / total) * 100 : 0}%`,
-                              background: colors[index],
-                            }}
-                          />
-                        </div>
-                        <span>{total > 0 ? ((bytes / total) * 100).toFixed(1) : '0.0'}%</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
             </div>
           </div>
         </>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useApp, type ResumeProject } from '../context'
 import { isRequestAborted } from '../utils/axiosAbort'
@@ -63,6 +63,7 @@ const labels = {
     lastPush: 'Last push',
     emptyResults: 'No repositories matched this view.',
     analyzeRepo: 'Analyze for resume',
+    benchmarkRepo: 'Benchmark repo',
     analyzingRepo: 'Analyzing repository...',
     addToResume: 'Add to resume',
     addedToResume: 'Added',
@@ -141,6 +142,7 @@ export function Repositories({ language }: RepositoriesProps) {
     toggleResumeProject,
   } = useApp()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const username = searchParams.get('user') || ''
   const targetRepo = searchParams.get('repo') || ''
   const [repos, setRepos] = useState<Repo[]>([])
@@ -442,6 +444,16 @@ export function Repositories({ language }: RepositoriesProps) {
                     }}
                   >
                     {analysisLoadingRepo === repo.name ? text.analyzingRepo : text.analyzeRepo}
+                  </button>
+                  <button
+                    type="button"
+                    className="repo-action-btn"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      navigate(`/compare/repos?mine=${encodeURIComponent(`${username}/${repo.name}`)}`)
+                    }}
+                  >
+                    {language === 'zh' ? '去做对标' : ((text as typeof labels.en).benchmarkRepo ?? 'Benchmark repo')}
                   </button>
                   <button
                     type="button"

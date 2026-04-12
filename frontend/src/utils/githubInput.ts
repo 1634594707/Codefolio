@@ -1,4 +1,5 @@
 const GITHUB_USERNAME_PATTERN = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/
+const GITHUB_REPO_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/
 
 export type GitHubUsernameValidationResult =
   | { valid: true; username: string }
@@ -9,6 +10,11 @@ export type ParsedGitHubInput =
   | { kind: 'user'; username: string }
   | { kind: 'repo'; username: string; repo: string }
   | { kind: 'invalid'; username: string }
+
+export type ParsedGitHubRepoInput =
+  | { kind: 'empty' }
+  | { kind: 'repo'; owner: string; repo: string; fullName: string }
+  | { kind: 'invalid'; value: string }
 
 function normalizeGitHubUrlCandidate(raw: string): string {
   if (/^https?:\/\//i.test(raw)) return raw
@@ -125,4 +131,43 @@ export function splitGitHubUsernameInputs(raw: string): string[] {
     .split(/[\s,;，；\n\r\t]+/)
     .map((item) => normalizeGitHubUsernameInput(item))
     .filter(Boolean)
+}
+
+export function parseGitHubRepoInput(raw: string): ParsedGitHubRepoInput {
+  const trimmed = raw.trim()
+  if (!trimmed) return { kind: 'empty' }
+
+  const fromUrl = extractRepoFromUrl(trimmed)
+  const candidate = fromUrl ? `${fromUrl.username}/${fromUrl.repo}` : trimmed.replace(/^@+/, '')
+  const segments = candidate
+    .split('/')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  if (segments.length !== 2) {
+    return { kind: 'invalid', value: trimmed }
+  }
+
+  const [owner, repo] = segments
+  if (!GITHUB_USERNAME_PATTERN.test(owner) || !GITHUB_REPO_SEGMENT_PATTERN.test(repo)) {
+    return { kind: 'invalid', value: trimmed }
+  }
+
+  return {
+    kind: 'repo',
+    owner,
+    repo,
+    fullName: `${owner}/${repo}`,
+  }
+}
+
+export function splitGitHubRepoInputs(raw: string): string[] {
+  const normalized = raw.trim()
+  if (!normalized) return []
+
+  return normalized
+    .split(/[\s,;，；\n\r\t]+/)
+    .map((item) => parseGitHubRepoInput(item))
+    .filter((item): item is Extract<ParsedGitHubRepoInput, { kind: 'repo' }> => item.kind === 'repo')
+    .map((item) => item.fullName)
 }

@@ -23,6 +23,9 @@ const Repositories = lazy(() =>
 const AIAnalysis = lazy(() => import('./pages/AIAnalysis').then((module) => ({ default: module.AIAnalysis })))
 const Export = lazy(() => import('./pages/Export').then((module) => ({ default: module.Export })))
 const Compare = lazy(() => import('./pages/Compare').then((module) => ({ default: module.Compare })))
+const CompareRepos = lazy(() =>
+  import('./pages/CompareRepos').then((module) => ({ default: module.CompareRepos })),
+)
 
 type Language = 'en' | 'zh'
 type Theme = 'light' | 'dark'
@@ -840,7 +843,9 @@ function Layout() {
                 <Route path="/repositories" element={<Repositories language={language} />} />
                 <Route path="/analysis" element={<AIAnalysis language={language} />} />
                 <Route path="/export" element={<Export language={language} />} />
-                <Route path="/compare" element={<Compare language={language} />} />
+                <Route path="/compare" element={<Navigate to="/compare/users" replace />} />
+                <Route path="/compare/users" element={<Compare language={language} />} />
+                <Route path="/compare/repos" element={<CompareRepos language={language} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
