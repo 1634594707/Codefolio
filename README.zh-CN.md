@@ -1,57 +1,36 @@
 # Codefolio
 
 <p align="center">
-  <a href="README.md">English</a> ·
-  <a href="https://github.com/1634594707/Codefolio/releases">发布版本</a> ·
+  <a href="README.md">English</a> |
+  <a href="https://github.com/1634594707/Codefolio/releases">发布版本</a> |
   <a href="LICENSE">许可证</a>
 </p>
 
-将 GitHub 公开足迹转化为专业简历、可分享社交卡片，以及可执行的仓库对标报告。
+Codefolio 可以把 GitHub 公开资料转成简历、社交分享卡片、AI 技术画像和仓库对标报告。
 
----
-
-## 功能特性
+## 功能概览
 
 | 功能 | 说明 |
 |---|---|
-| **GitScore** | 多维度开发者评分（0–100） |
-| **AI 洞察** | 大语言模型生成的风格标签与技术摘要 |
-| **简历生成** | Markdown / PDF 专业简历输出 |
-| **社交卡片** | 适合社交媒体分享的 PNG 卡片 |
-| **开发者对比** | 最多三名 GitHub 用户并排对比 |
-| **仓库对标** | 我的仓库 vs 同类标杆——差距矩阵、行动项、成功假设卡片 |
-| **推荐标杆** | 通过 GitHub Search API 自动推荐相似仓库 |
-| **导出** | 一键导出完整对标报告（Markdown，中英文） |
-| **缓存** | Redis 缓存，按数据类型差异化 TTL |
-| **国际化** | 中英文界面与内容 |
-| **主题** | 亮色 / 暗色模式 |
+| GitScore | 多维度开发者评分 |
+| AI 洞察 | 风格标签、吐槽文案、技术总结 |
+| 简历导出 | Markdown / PDF 导出 |
+| 社交卡片 | 适合分享的图片卡片 |
+| 开发者对比 | 最多 3 个 GitHub 用户并排对比 |
+| 仓库对标 | 我的仓库与同类项目差距分析 |
+| 仓库推荐 | 自动推荐可对标的仓库 |
+| 工作区隔离 | AI 与 benchmark 结果按浏览器工作区隔离 |
+| Docker 部署 | 提供本地和生产环境容器编排 |
 
----
+## 技术栈
 
-## v1.1.0 更新内容
+- 前端：React 18、Vite、Tailwind CSS
+- 后端：FastAPI、Python 3.11
+- 缓存：Redis
+- 存储：SQLite 快照库
+- 上游接口：GitHub REST / GraphQL、兼容 OpenAI 的 LLM API
 
-- **仓库对标**正式上线——8 维度差距矩阵、行动项、成功假设卡片、可选 LLM 叙述摘要
-- **推荐标杆**按语言、话题、规模自动推荐相似仓库
-- **Markdown 导出**完整对标报告（中英文）
-- **过期警告**：缓存数据超过 7 天时提示刷新
-- **速率限制**：per-IP 滑动窗口，保护 benchmark 接口
-- **Token 脱敏**：GitHub Token 不会出现在日志或错误响应中
-- **完整测试套件**：36 个属性测试（Hypothesis）+ 前端单元/属性测试（Vitest + fast-check）
-
-完整变更记录见 [CHANGELOG.md](CHANGELOG.md)。
-
----
-
-## 技术架构
-
-- **前端**：React 18 + Vite + Tailwind CSS
-- **后端**：Python 3.11+ + FastAPI
-- **缓存**：Redis 7+
-- **API**：GitHub REST/GraphQL API、DeepSeek / GPT-4o-mini
-
----
-
-## 快速开始
+## 本地开发
 
 ### 环境要求
 
@@ -59,21 +38,24 @@
 - Node.js 18+
 - Redis 7+
 
-### 后端
+### 启动后端
 
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # 填入你的 API 密钥
-redis-server &
-python main.py
+cp .env.example .env
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-后端服务运行在 `http://localhost:8000`
+Windows 激活虚拟环境：
 
-### 前端
+```powershell
+venv\Scripts\activate
+```
+
+### 启动前端
 
 ```bash
 cd frontend
@@ -81,109 +63,137 @@ npm install
 npm run dev
 ```
 
-前端服务运行在 `http://localhost:5173`
+默认地址：
 
----
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8000`
+
+## Docker
+
+### 开发环境
+
+```bash
+docker compose up --build
+```
+
+服务说明：
+
+- 前端：`http://localhost:8080`
+- 后端：容器内 `backend:8000`
+- Redis：容器内 `redis:6379`
+
+### 生产环境
+
+1. 准备后端密钥文件：
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+2. 准备生产环境变量：
+
+```bash
+cp .env.production.example .env.production
+```
+
+3. 修改以下内容：
+
+- `backend/.env`：填写 `GITHUB_TOKEN`、`AI_API_KEY`、`AI_MODEL`
+- `.env.production`：填写你的域名、对外端口
+
+4. 启动生产环境：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+生产说明：
+
+- 前端由 Nginx 提供静态资源
+- `/api/*` 会被代理到后端容器
+- `backend-data` 卷负责持久化 SQLite 数据
+- `redis-data` 卷负责持久化 Redis 数据
+- Compose 会等待 Redis 和后端健康后再拉起前端
+
+更详细的上线说明见 [DEPLOYMENT.md](/D:/Administrator/Desktop/Project/Codefolio/DEPLOYMENT.md)。
+
+## 生产部署检查清单
+
+- 设置有效的 `GITHUB_TOKEN`
+- 设置有效的 `AI_API_KEY`
+- 将 `CORS_ORIGINS` 收敛到真实域名
+- 不要提交 `backend/.env` 和 `.env.production`
+- 定期备份 `backend-data` 卷
+- 对公网部署时务必接入 HTTPS
+
+## 工作区隔离
+
+Codefolio 现在会为浏览器生成一个工作区 id，并通过 `X-Codefolio-Workspace` 传给后端。
+
+- GitHub 原始公共数据仍然可以共享缓存
+- AI 总结、仓库分析和 benchmark 报告按工作区单独存储
+- 后端会登记活跃工作区，为后续升级成账号体系或团队体系做准备
 
 ## 环境变量
 
-```env
-# GitHub API
-GITHUB_TOKEN=你的_github_token
+常用后端变量：
 
-# AI API
-AI_API_KEY=你的_ai_api_key
+```env
+GITHUB_TOKEN=your_github_token
+AI_API_KEY=your_ai_api_key
 AI_API_BASE_URL=https://api.deepseek.com/v1
 AI_MODEL=deepseek-chat
-
-# Redis
+AI_REQUEST_TIMEOUT=60.0
 REDIS_URL=redis://localhost:6379
 REDIS_DB=0
-
-# CORS 跨域
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-
-# 缓存过期时间（秒）
+DATABASE_PATH=/app/data/codefolio.db
+CORS_ORIGINS=http://localhost:8080,https://your-domain.com
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800
-
-# 速率限制（benchmark 接口）
-RATE_LIMIT_MAX_REQUESTS=10
-RATE_LIMIT_WINDOW_SECONDS=60
+REPOSITORY_METADATA_TTL=3600
+REPOSITORY_README_TTL=21600
+REPOSITORY_STAR_HISTORY_TTL=86400
+BENCHMARK_RATE_LIMIT_MAX_REQUESTS=10
+BENCHMARK_RATE_LIMIT_WINDOW_SECONDS=60
+LLM_NARRATIVE_ENABLED=true
+LLM_MAX_README_CHARS_PER_REPO=12000
 ```
 
----
+完整模板见 [backend/.env.example](/D:/Administrator/Desktop/Project/Codefolio/backend/.env.example)。
 
-## API 接口
+## API
 
 ### 核心接口
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `GET` | `/api/health` | 健康检查 |
-| `POST` | `/api/generate` | 生成开发者档案 |
+| `GET` | `/api/health` | 服务健康检查 |
+| `POST` | `/api/generate` | 生成开发者画像 |
+| `POST` | `/api/workspaces/ensure` | 注册或刷新工作区 |
 
 ### 仓库对标接口
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `POST` | `/api/repos/profile` | 获取 / 缓存仓库画像 |
-| `POST` | `/api/repos/benchmark` | 多仓库对比（1–3 个标杆） |
-| `GET` | `/api/repos/suggest-benchmarks` | 自动推荐相似标杆仓库 |
-| `DELETE` | `/api/repos/cache/{owner}/{repo}` | 清除仓库缓存 |
+| `POST` | `/api/repos/profile` | 获取或缓存仓库画像 |
+| `POST` | `/api/repos/benchmark` | 执行仓库对标分析 |
+| `GET` | `/api/repos/suggest-benchmarks` | 推荐相似仓库 |
+| `DELETE` | `/api/repos/cache/{owner}/{repo}` | 清理仓库缓存 |
 
----
+## 已验证内容
 
-## 项目结构
+当前仓库里已经验证：
 
-```
-codefolio/
-├── backend/
-│   ├── main.py
-│   ├── config.py
-│   ├── benchmark_models.py          # 数据模型
-│   ├── cache_keys.py                # Redis 键统一定义
-│   ├── i18n/                        # 中英文翻译文件
-│   ├── routers/
-│   │   └── repos_benchmark.py       # 对标 API 路由
-│   ├── services/
-│   │   ├── benchmark_analysis_service.py
-│   │   ├── benchmark_recommendation_service.py
-│   │   ├── bucket_service.py
-│   │   ├── dimension_analyzer.py
-│   │   ├── action_generator.py
-│   │   ├── repository_profile_service.py
-│   │   ├── github_service.py
-│   │   └── ai_service.py
-│   └── utils/
-│       ├── rate_limiter.py
-│       ├── token_redaction.py
-│       └── redis_client.py
-├── frontend/
-│   └── src/
-│       ├── components/
-│       │   ├── BenchmarkMatrix.tsx
-│       │   ├── ActionList.tsx
-│       │   └── HypothesisCards.tsx
-│       ├── pages/
-│       │   ├── CompareRepos.tsx
-│       │   └── Export.tsx
-│       ├── utils/
-│       │   ├── benchmarkExport.ts
-│       │   └── formatCacheAge.ts
-│       └── types/
-│           └── benchmark.ts
-├── CHANGELOG.md
-├── LICENSE
-├── README.md
-└── README.zh-CN.md
-```
+- 前端生产构建通过
+- 前端 benchmark 相关测试通过
+- 后端 Python 语法检查通过
+- `docker compose config` 通过
 
----
+当前环境限制：
+
+- 后端完整 pytest 依赖本机安装 `hypothesis`
+- `docker compose build` 仍可能因为当前机器无法访问 Docker Hub 而失败
 
 ## 许可证
 
-本项目采用 **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)**，完整条文见 [`LICENSE`](LICENSE)。
-
-- ✅ 个人学习、研究、教育、符合条件的非营利机构
-- ❌ 商业使用需另行获得版权方书面授权
-
-SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+项目使用 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)。
