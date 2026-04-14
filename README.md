@@ -85,6 +85,38 @@ Frontend runs at `http://localhost:5173`
 
 ---
 
+## Docker
+
+Run the full stack with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- `frontend`: `http://localhost:8080`
+- `backend`: internal FastAPI service on `backend:8000`
+- `redis`: internal Redis service on `redis:6379`
+
+Notes:
+
+- Frontend is served by Nginx and proxies `/api/*` to the backend container.
+- Backend SQLite data is persisted in the `backend-data` volume.
+- Redis data is persisted in the `redis-data` volume.
+
+---
+
+## Workspace Isolation
+
+Codefolio now uses a browser-scoped workspace id to isolate user-facing AI and benchmark artifacts.
+
+- Public GitHub source data can still be shared through global caching.
+- AI summaries, repository analysis outputs, and benchmark reports are stored per workspace scope.
+- Active workspaces are registered in the backend database for future user/workspace upgrades.
+
+---
+
 ## Environment Variables
 
 ```env
@@ -121,6 +153,7 @@ RATE_LIMIT_WINDOW_SECONDS=60
 |---|---|---|
 | `GET` | `/api/health` | Health check |
 | `POST` | `/api/generate` | Generate developer profile |
+| `POST` | `/api/workspaces/ensure` | Register / refresh an active workspace scope |
 
 ### Repository Benchmark
 | Method | Path | Description |

@@ -131,7 +131,13 @@ function markdownToHtml(markdown: string): string {
 }
 
 export function Export({ language }: ExportProps) {
-  const { contentLanguage, getGenerateCache, cacheGenerateResult, getResumeProjects } = useApp()
+  const {
+    contentLanguage,
+    getGenerateCache,
+    cacheGenerateResult,
+    getResumeProjects,
+    getLatestBenchmarkWorkspaceEntryForUser,
+  } = useApp()
   const [searchParams] = useSearchParams()
   const username = searchParams.get('user') || ''
   const [data, setData] = useState<GenerateResponse | null>(null)
@@ -149,6 +155,7 @@ export function Export({ language }: ExportProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const text = labels[language]
   const selectedProjects = getResumeProjects(username)
+  const savedBenchmarkEntry = username ? getLatestBenchmarkWorkspaceEntryForUser(username) : null
 
   useEffect(() => {
     if (!username) return
@@ -207,8 +214,13 @@ export function Export({ language }: ExportProps) {
   useEffect(() => {
     const mine = searchParams.get('mine') ?? ''
     const benchmarks = (searchParams.get('b') ?? '').split(',').filter(Boolean)
-    if (!includeBenchmark || !mine || benchmarks.length === 0) {
+    if (!includeBenchmark) {
       setBenchmarkResult(null)
+      setBenchmarkError('')
+      return
+    }
+    if (!mine || benchmarks.length === 0) {
+      setBenchmarkResult(savedBenchmarkEntry?.result ?? null)
       setBenchmarkError('')
       return
     }
@@ -244,7 +256,7 @@ export function Export({ language }: ExportProps) {
       cancelled = true
       abortController.abort()
     }
-  }, [includeBenchmark, searchParams, contentLanguage, text.benchmarkError])
+  }, [includeBenchmark, searchParams, contentLanguage, text.benchmarkError, savedBenchmarkEntry])
 
   const exportPdf = async () => {
     if (!resumeRef.current || !data) return

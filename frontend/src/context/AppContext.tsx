@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import type { GenerateResponse } from '../types/generate'
+import type { BenchmarkResponse } from '../types/benchmark'
 import { githubLoginEquals } from '../utils/githubLogin'
 import { validateGitHubUsername } from '../utils/githubInput'
 
@@ -27,6 +28,15 @@ export type ResumeProject = {
   analysisSummary: string
   highlights: string[]
   keywords: string[]
+}
+
+export type BenchmarkWorkspaceEntry = {
+  username: string
+  mine: string
+  benchmarks: string[]
+  language: ContentLanguage
+  result: BenchmarkResponse
+  savedAt: number
 }
 
 function readStoredCurrentUser(): string {
@@ -64,6 +74,8 @@ interface AppContextType {
   getResumeProjects: (username: string) => ResumeProject[]
   toggleResumeProject: (project: ResumeProject) => void
   removeResumeProject: (username: string, repoName: string) => void
+  saveBenchmarkWorkspaceEntry: (entry: Omit<BenchmarkWorkspaceEntry, 'savedAt'>) => void
+  getLatestBenchmarkWorkspaceEntryForUser: (username: string) => BenchmarkWorkspaceEntry | null
   compareList: string[]
   setCompareList: (list: string[]) => void
   addToCompare: (username: string) => void
@@ -74,6 +86,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 
 const GENERATE_CACHE_STORAGE_KEY = 'codefolio-generate-cache'
 const RESUME_PROJECTS_STORAGE_KEY = 'codefolio-resume-projects'
+const BENCHMARK_WORKSPACE_STORAGE_KEY = 'codefolio-benchmark-workspace'
 
 function readStoredGenerateCache(): GenerateCacheEntry[] {
   if (typeof window === 'undefined') return []
@@ -104,6 +117,21 @@ function readStoredResumeProjects(): ResumeProject[] {
   }
 }
 
+function readStoredBenchmarkWorkspace(): BenchmarkWorkspaceEntry[] {
+  if (typeof window === 'undefined') return []
+  const saved = localStorage.getItem(BENCHMARK_WORKSPACE_STORAGE_KEY)
+  if (!saved) return []
+
+  try {
+    const parsed = JSON.parse(saved) as BenchmarkWorkspaceEntry[]
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => item?.username && item?.mine && item?.benchmarks && item?.result).slice(0, 12)
+      : []
+  } catch {
+    return []
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, _setCurrentUser] = useState(readStoredCurrentUser)
   const setCurrentUser = useCallback((user: string) => {
@@ -118,6 +146,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(readInitialContentLanguage)
   const [generateCacheEntries, setGenerateCacheEntries] = useState<GenerateCacheEntry[]>(readStoredGenerateCache)
   const [resumeProjects, setResumeProjects] = useState<ResumeProject[]>(readStoredResumeProjects)
+  const [benchmarkWorkspaceEntries, setBenchmarkWorkspaceEntries] =
+    useState<BenchmarkWorkspaceEntry[]>(readStoredBenchmarkWorkspace)
 
   const cacheGenerateResult = useCallback((entry: Omit<GenerateCacheEntry, 'cachedAt'>) => {
     const normalizedUsername = entry.username.trim()
@@ -175,6 +205,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(RESUME_PROJECTS_STORAGE_KEY, JSON.stringify(resumeProjects))
   }, [resumeProjects])
 
+  useEffect(() => {
+    localStorage.setItem(BENCHMARK_WORKSPACE_STORAGE_KEY, JSON.stringify(benchmarkWorkspaceEntries))
+  }, [benchmarkWorkspaceEntries])
+
   const getResumeProjects = useCallback(
     (username: string) => resumeProjects.filter((project) => githubLoginEquals(project.user, username)),
     [resumeProjects],
@@ -203,6 +237,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
       prev.filter((item) => !(githubLoginEquals(item.user, username) && item.repoName === repoName)),
     )
   }, [])
+
+  const saveBenchmarkWorkspaceEntry = useCallback((entry: Omit<BenchmarkWorkspaceEntry, 'savedAt'>) => {
+    const parsed = validateGitHubUsername(entry.username)
+    if (!parsed.valid) return
+
+    setBenchmarkWorkspaceEntries((prev) => {
+      const nextEntry: BenchmarkWorkspaceEntry = {
+        ...entry,
+        username: parsed.username,
+        savedAt: Date.now(),
+      }
+      const filtered = prev.filter(
+        (item) =>
+          !(
+            githubLoginEquals(item.username, parsed.username) &&
+            item.mine.toLowerCase() === nextEntry.mine.toLowerCase() &&
+            item.language === nextEntry.language
+          ),
+      )
+      return [nextEntry, ...filtered].slice(0, 12)
+    })
+  }, [])
+
+  const getLatestBenchmarkWorkspaceEntryForUser = useCallback(
+    (username: string) => {
+      const parsed = validateGitHubUsername(username)
+      if (!parsed.valid) return null
+      return benchmarkWorkspaceEntries.find((entry) => githubLoginEquals(entry.username, parsed.username)) ?? null
+    },
+    [benchmarkWorkspaceEntries],
+  )
 
   const [compareList, setCompareList] = useState<string[]>(() => {
     // Load from localStorage on init
@@ -255,6 +320,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getResumeProjects,
         toggleResumeProject,
         removeResumeProject,
+        saveBenchmarkWorkspaceEntry,
+        getLatestBenchmarkWorkspaceEntryForUser,
         compareList,
         setCompareList,
         addToCompare,

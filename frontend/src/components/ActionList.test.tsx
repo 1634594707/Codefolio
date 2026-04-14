@@ -3,7 +3,7 @@
  * Validates: Requirements 10.3, 10.4
  */
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { ActionList } from './ActionList'
 import type { ActionItem } from '../types/benchmark'
 

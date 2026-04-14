@@ -1,0 +1,10 @@
+.git
+.gitignore
+**/__pycache__
+**/.pytest_cache
+**/.hypothesis
+**/node_modules
+**/dist
+**/.vscode
+**/*.log
+dump.rdb

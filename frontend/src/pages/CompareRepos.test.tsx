@@ -7,6 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { CompareRepos } from './CompareRepos'
 
+vi.mock('../context', () => ({
+  useApp: () => ({
+    saveBenchmarkWorkspaceEntry: vi.fn(),
+  }),
+}))
+
 // Mock axios to prevent real API calls
 vi.mock('axios', async () => {
   const actual = await vi.importActual<typeof import('axios')>('axios')
@@ -48,6 +54,12 @@ describe('CompareRepos', () => {
     it('renders the generate benchmark button', () => {
       renderCompareRepos()
       expect(screen.getByRole('button', { name: 'Generate benchmark' })).toBeInTheDocument()
+    })
+
+    it('renders compare mode tabs', () => {
+      renderCompareRepos()
+      expect(screen.getByRole('tab', { name: 'Developers' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Repositories' })).toBeInTheDocument()
     })
 
     it('shows empty state hint when no inputs', () => {

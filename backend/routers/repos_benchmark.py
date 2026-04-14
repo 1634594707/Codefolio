@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from benchmark_models import BenchmarkReport, BenchmarkSuggestion, FeatureMatrix
 from cache_keys import repo_profile_cache_key, repository_profile_cache_key
+from database import ARTIFACT_BENCHMARK_REPORT, snapshot_store
 from services.ai_service import AIService
 from services.benchmark_analysis_service import BenchmarkAnalysisService
 from services.benchmark_recommendation_service import BenchmarkRecommendationService
@@ -23,6 +24,7 @@ from services.github_service import GitHubService
 from services.repository_profile_service import RepositoryProfileService
 from utils.rate_limiter import benchmark_rate_limiter
 from utils.redis_client import redis_client
+from utils.workspace_scope import WORKSPACE_HEADER, normalize_workspace_scope
 
 try:
     router = APIRouter(prefix="/api/repos", tags=["repository-benchmarking"])
@@ -182,9 +184,16 @@ async def fetch_repository_profile(request: RepositoryProfileRequestModel, _rl: 
 
 
 @router.post("/benchmark")
-async def benchmark_repositories(request: RepositoryBenchmarkRequestModel, _rl: None = fastapi.Depends(_require_rate_limit)):
+async def benchmark_repositories(
+    request: RepositoryBenchmarkRequestModel,
+    http_request: fastapi.Request,
+    _rl: None = fastapi.Depends(_require_rate_limit),
+):
     mine = sanitize_repository_full_name(request.mine)
     benchmarks = [sanitize_repository_full_name(item) for item in request.benchmarks]
+    workspace_scope = normalize_workspace_scope(http_request.headers.get(WORKSPACE_HEADER))
+    if workspace_scope != "global":
+        await snapshot_store.ensure_workspace(workspace_scope)
     unique_benchmarks = list(dict.fromkeys(item for item in benchmarks if item != mine))
 
     if not unique_benchmarks:
@@ -212,6 +221,7 @@ async def benchmark_repositories(request: RepositoryBenchmarkRequestModel, _rl: 
             language=request.language,
             include_narrative=request.options.include_narrative,
             max_readme_chars=request.options.max_readme_chars_per_repo,
+            workspace_scope=workspace_scope,
         )
         return _encode_report(report)
     except HTTPException:
@@ -276,5 +286,8 @@ async def invalidate_repository_cache(owner: str, repo: str):
     # Delete any benchmark cache keys that reference this repo
     deleted += await redis_client.delete_pattern(f"benchmark:v1:*")
     deleted += await redis_client.delete_pattern(f"benchmark:v2:*")
+    deleted += await redis_client.delete_pattern(f"ws:*:benchmark:v1:*")
+    deleted += await redis_client.delete_pattern(f"ws:*:benchmark:v2:*")
+    deleted += await snapshot_store.delete_artifact_all_rows(ARTIFACT_BENCHMARK_REPORT)
 
     return {"deleted_keys": deleted, "repository": f"{owner_lower}/{repo_lower}"}

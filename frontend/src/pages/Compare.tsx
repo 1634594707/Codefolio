@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
   BarChart,
@@ -133,8 +133,18 @@ const labels = {
   },
 } as const
 
-function CompareModeTabs(_: CompareProps) {
-  return null
+function CompareModeTabs({ language }: CompareProps) {
+  const text = labels[language]
+  return (
+    <div className="repo-view-switcher" role="tablist" aria-label={text.title}>
+      <Link to="/compare/users" className="repo-view-chip active" role="tab" aria-selected="true">
+        {text.tabsUsers}
+      </Link>
+      <Link to="/compare/repos" className="repo-view-chip" role="tab" aria-selected="false">
+        {text.tabsRepos}
+      </Link>
+    </div>
+  )
 }
 
 export function Compare({ language }: CompareProps) {

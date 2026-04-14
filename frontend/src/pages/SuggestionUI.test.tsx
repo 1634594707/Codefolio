@@ -143,7 +143,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
         response: { data: { detail: { message: 'Failed to fetch suggestions.' } } },
       })
       mockedAxios.get.mockRejectedValueOnce(axiosError)
-      mockedAxios.isAxiosError = vi.fn().mockReturnValue(true) as typeof axios.isAxiosError
+      mockedAxios.isAxiosError = vi.fn().mockReturnValue(true) as unknown as typeof axios.isAxiosError
 
       renderCompareRepos()
       const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]

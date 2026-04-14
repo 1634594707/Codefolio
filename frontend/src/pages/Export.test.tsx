@@ -2,7 +2,7 @@
  * Unit tests for Export page - benchmark integration
  * Task 27.2 - Validates: Requirements 12.1
  */
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { generateBenchmarkMarkdown, type BenchmarkExportReport } from '../utils/benchmarkExport'
@@ -218,6 +218,7 @@ vi.mock('../context', () => ({
     getGenerateCache: vi.fn().mockReturnValue(null),
     cacheGenerateResult: vi.fn(),
     getResumeProjects: vi.fn().mockReturnValue([]),
+    getLatestBenchmarkWorkspaceEntryForUser: vi.fn().mockReturnValue(null),
   }),
 }))
 

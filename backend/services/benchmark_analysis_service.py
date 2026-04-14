@@ -40,6 +40,7 @@ from services.dimension_analyzer import (
 )
 from services.repository_profile_service import RepositoryProfileService
 from utils.redis_client import redis_client
+from utils.workspace_scope import scoped_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +113,12 @@ class BenchmarkAnalysisService:
         include_narrative: bool = False,
         force_refresh: bool = False,
         max_readme_chars: int = _DEFAULT_MAX_README_CHARS,
+        workspace_scope: str = "global",
     ) -> BenchmarkReport:
-        cache_key = benchmark_cache_key(mine, benchmarks, language, include_narrative)
+        cache_key = scoped_cache_key(
+            benchmark_cache_key(mine, benchmarks, language, include_narrative),
+            workspace_scope,
+        )
         if not force_refresh:
             cached = await redis_client.get(cache_key)
             if cached:
@@ -123,6 +128,7 @@ class BenchmarkAnalysisService:
                 cache_key,
                 language=language,
                 max_age_seconds=3600,
+                tenant_scope=workspace_scope,
             )
             if db_snapshot:
                 await redis_client.set(cache_key, db_snapshot, 3600)
@@ -177,6 +183,7 @@ class BenchmarkAnalysisService:
             cache_key,
             serialized,
             language=language,
+            tenant_scope=workspace_scope,
         )
         return report
 

@@ -15,6 +15,7 @@ import { SkeletonScreen } from './SkeletonScreen'
 import type { GenerateResponse } from './types/generate'
 import { isRequestAborted } from './utils/axiosAbort'
 import { normalizeGitHubUsernameInput, parseGitHubInput, validateGitHubUsername } from './utils/githubInput'
+import { getOrCreateWorkspaceId } from './utils/workspace'
 
 const Overview = lazy(() => import('./pages/Overview').then((module) => ({ default: module.Overview })))
 const Repositories = lazy(() =>
@@ -299,6 +300,9 @@ function Layout() {
     setContentLanguage(initialLanguage)
     setSearchSuggestions(readHistoryItems().map((item) => item.username))
     document.documentElement.classList.toggle('dark', initialTheme === 'dark')
+    const workspaceId = getOrCreateWorkspaceId()
+    axios.defaults.headers.common['X-Codefolio-Workspace'] = workspaceId
+    void axios.post(`${API_BASE_URL}/api/workspaces/ensure`).catch(() => undefined)
   }, [])
 
   useLayoutEffect(() => {

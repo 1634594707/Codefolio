@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.2.0] - 2026-04-14
+
+### Added
+
+- Frontend workspace isolation with persisted `workspaceId`, automatic `X-Codefolio-Workspace` request header, and startup registration via `POST /api/workspaces/ensure`
+- Workspace-aware benchmark persistence so the latest repository comparison result can be reused on the export page without rebuilding query params
+- Docker support for the full stack with `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `.dockerignore`, and root `docker-compose.yml`
+
+### Changed
+
+- Backend snapshot storage now supports `tenant_scope` and records active workspaces in a dedicated `workspaces` table
+- AI analysis, repository benchmark analysis, Redis cache keys, and snapshot invalidation now respect workspace scope instead of sharing one global artifact set
+- Repository comparison flow now fills empty benchmark slots more naturally and stores successful results into the current workspace context
+
 ## [v1.1.0] - 2026-04-14
 
 ### 新增功能

@@ -24,6 +24,7 @@ from database import (
 )
 from models import GitScore, Repository, RepositoryAIAnalysis, UserData
 from utils.redis_client import redis_client
+from utils.workspace_scope import scoped_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +124,9 @@ class AIService:
         user_data: UserData,
         gitscore: GitScore,
         language: str = "en",
+        workspace_scope: str = "global",
     ) -> List[str]:
-        cache_key = f"ai:{user_data.username}:tags:{language}"
+        cache_key = scoped_cache_key(f"ai:{user_data.username}:tags:{language}", workspace_scope)
         cached_tags = await redis_client.get(cache_key)
         if cached_tags:
             logger.info("Cache hit for style tags: %s", user_data.username)
@@ -135,6 +137,7 @@ class AIService:
             user_data.username,
             language=language,
             max_age_seconds=AI_CACHE_TTL,
+            tenant_scope=workspace_scope,
         )
         if db_snapshot:
             await redis_client.set(cache_key, db_snapshot, AI_CACHE_TTL)
@@ -185,6 +188,7 @@ No additional text or explanation."""
                 user_data.username,
                 {"tags": result_tags},
                 language=language,
+                tenant_scope=workspace_scope,
             )
             return result_tags
         except httpx.TimeoutException:
@@ -206,8 +210,9 @@ No additional text or explanation."""
         user_data: UserData,
         gitscore: GitScore,
         language: str = "en",
+        workspace_scope: str = "global",
     ) -> str:
-        cache_key = f"ai:{user_data.username}:roast:{language}"
+        cache_key = scoped_cache_key(f"ai:{user_data.username}:roast:{language}", workspace_scope)
         cached_roast = await redis_client.get(cache_key)
         if cached_roast:
             logger.info("Cache hit for roast comment: %s", user_data.username)
@@ -218,6 +223,7 @@ No additional text or explanation."""
             user_data.username,
             language=language,
             max_age_seconds=AI_CACHE_TTL,
+            tenant_scope=workspace_scope,
         )
         if db_snapshot:
             await redis_client.set(cache_key, db_snapshot, AI_CACHE_TTL)
@@ -253,6 +259,7 @@ Generate ONE humorous roast comment. Output ONLY the comment text, no quotes or 
                 user_data.username,
                 {"comment": comment},
                 language=language,
+                tenant_scope=workspace_scope,
             )
             return comment
         except ValueError as error:
@@ -267,8 +274,13 @@ Generate ONE humorous roast comment. Output ONLY the comment text, no quotes or 
             logger.error("Unexpected error generating roast comment for %s: %s", user_data.username, error)
             return ""
 
-    async def generate_tech_summary(self, user_data: UserData, language: str = "en") -> str:
-        cache_key = f"ai:{user_data.username}:summary:v2:{language}"
+    async def generate_tech_summary(
+        self,
+        user_data: UserData,
+        language: str = "en",
+        workspace_scope: str = "global",
+    ) -> str:
+        cache_key = scoped_cache_key(f"ai:{user_data.username}:summary:v2:{language}", workspace_scope)
         cached_summary = await redis_client.get(cache_key)
         if cached_summary:
             logger.info("Cache hit for tech summary: %s", user_data.username)
@@ -279,6 +291,7 @@ Generate ONE humorous roast comment. Output ONLY the comment text, no quotes or 
             user_data.username,
             language=language,
             max_age_seconds=AI_CACHE_TTL,
+            tenant_scope=workspace_scope,
         )
         if db_snapshot:
             await redis_client.set(cache_key, db_snapshot, AI_CACHE_TTL)
@@ -317,6 +330,7 @@ Write ONLY the bullet list, nothing else."""
                 user_data.username,
                 {"summary": summary},
                 language=language,
+                tenant_scope=workspace_scope,
             )
             return summary
         except ValueError as error:
@@ -336,8 +350,12 @@ Write ONLY the bullet list, nothing else."""
         user_data: UserData,
         repository: Repository,
         language: str = "en",
+        workspace_scope: str = "global",
     ) -> RepositoryAIAnalysis:
-        cache_key = repository_analysis_cache_key(user_data.username, repository.name, language)
+        cache_key = scoped_cache_key(
+            repository_analysis_cache_key(user_data.username, repository.name, language),
+            workspace_scope,
+        )
         cached = await redis_client.get(cache_key)
         if cached:
             return RepositoryAIAnalysis(
@@ -354,6 +372,7 @@ Write ONLY the bullet list, nothing else."""
             f"{user_data.username}/{repository.name.lower()}",
             language=language,
             max_age_seconds=AI_CACHE_TTL,
+            tenant_scope=workspace_scope,
         )
         if db_snapshot:
             await redis_client.set(cache_key, db_snapshot, AI_CACHE_TTL)
@@ -436,6 +455,7 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                     "evidence": result.evidence,
                 },
                 language=language,
+                tenant_scope=workspace_scope,
             )
             return result
         except Exception as error:
@@ -451,6 +471,7 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                     "evidence": fallback.evidence,
                 },
                 language=language,
+                tenant_scope=workspace_scope,
             )
             return fallback
 

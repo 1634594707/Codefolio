@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -26,6 +26,7 @@ from services.language_trends import compute_language_trends
 from services.render_service import RenderService
 from services.score_engine import ScoreEngine
 from utils.redis_client import redis_client
+from utils.workspace_scope import WORKSPACE_HEADER, normalize_workspace_scope
 
 
 USERNAME_PATTERN = re.compile(r"^(?=.{1,39}$)(?!-)(?!.*--)[A-Za-z0-9-]+(?<!-)$")
@@ -136,11 +137,12 @@ async def generate_localized_output(
     user_data,
     gitscore,
     language: str,
+    workspace_scope: str,
 ):
     style_tags, roast_comment, tech_summary = await asyncio.gather(
-        ai_service.generate_style_tags(user_data, gitscore, language),
-        ai_service.generate_roast_comment(user_data, gitscore, language),
-        ai_service.generate_tech_summary(user_data, language),
+        ai_service.generate_style_tags(user_data, gitscore, language, workspace_scope=workspace_scope),
+        ai_service.generate_roast_comment(user_data, gitscore, language, workspace_scope=workspace_scope),
+        ai_service.generate_tech_summary(user_data, language, workspace_scope=workspace_scope),
     )
 
     from models import AIInsights
@@ -172,7 +174,12 @@ async def generate_localized_output(
     }
 
 
-async def build_generation_payload(username: str, language: str, include_all_languages: bool = False) -> dict:
+async def build_generation_payload(
+    username: str,
+    language: str,
+    include_all_languages: bool = False,
+    workspace_scope: str = "global",
+) -> dict:
     user_data = await github_service.fetch_user_data(username)
     gitscore = score_engine.calculate_gitscore(user_data)
 
@@ -180,7 +187,16 @@ async def build_generation_payload(username: str, language: str, include_all_lan
     ai_service = AIService()
     try:
         localized_results = await asyncio.gather(
-            *(generate_localized_output(ai_service, user_data, gitscore, content_language) for content_language in languages_to_generate)
+            *(
+                generate_localized_output(
+                    ai_service,
+                    user_data,
+                    gitscore,
+                    content_language,
+                    workspace_scope,
+                )
+                for content_language in languages_to_generate
+            )
         )
     finally:
         await ai_service.close()
@@ -216,9 +232,16 @@ async def health_check():
     }
 
 
+async def ensure_workspace_scope(workspace_scope: str) -> None:
+    if workspace_scope != "global":
+        await snapshot_store.ensure_workspace(workspace_scope)
+
+
 @app.post("/api/repository/analyze")
-async def analyze_repository(request: RepositoryAnalysisRequestModel):
+async def analyze_repository(request: RepositoryAnalysisRequestModel, http_request: Request):
     username = sanitize_username(request.username)
+    workspace_scope = normalize_workspace_scope(http_request.headers.get(WORKSPACE_HEADER))
+    await ensure_workspace_scope(workspace_scope)
     try:
         user_data = await github_service.fetch_user_data(username)
         repository = next(
@@ -236,7 +259,12 @@ async def analyze_repository(request: RepositoryAnalysisRequestModel):
 
         ai_service = AIService()
         try:
-            analysis = await ai_service.generate_repository_analysis(user_data, repository, request.language)
+            analysis = await ai_service.generate_repository_analysis(
+                user_data,
+                repository,
+                request.language,
+                workspace_scope=workspace_scope,
+            )
         finally:
             await ai_service.close()
 
@@ -263,10 +291,17 @@ async def analyze_repository(request: RepositoryAnalysisRequestModel):
 
 
 @app.post("/api/generate")
-async def generate_profile(request: GenerateRequestModel):
+async def generate_profile(request: GenerateRequestModel, http_request: Request):
     username = sanitize_username(request.username)
+    workspace_scope = normalize_workspace_scope(http_request.headers.get(WORKSPACE_HEADER))
+    await ensure_workspace_scope(workspace_scope)
     try:
-        return await build_generation_payload(username, request.language, include_all_languages=False)
+        return await build_generation_payload(
+            username,
+            request.language,
+            include_all_languages=False,
+            workspace_scope=workspace_scope,
+        )
     except HTTPException:
         raise
     except Exception as error:
@@ -275,15 +310,19 @@ async def generate_profile(request: GenerateRequestModel):
 
 @app.get("/api/export/pdf")
 async def export_pdf(
+    request: Request,
     username: str = Query(..., min_length=1, max_length=39),
     language: Literal["en", "zh"] = "en",
 ):
     sanitized_username = sanitize_username(username)
+    workspace_scope = normalize_workspace_scope(request.headers.get(WORKSPACE_HEADER))
+    await ensure_workspace_scope(workspace_scope)
     try:
         payload = await build_generation_payload(
             sanitized_username,
             language,
             include_all_languages=False,
+            workspace_scope=workspace_scope,
         )
         pdf_bytes = render_service.generate_pdf_resume(payload["resume_markdown"])
     except HTTPException:
@@ -309,18 +348,22 @@ async def clear_user_cache(username: str):
         )
         for key in keys_to_clear:
             await redis_client.delete(key)
+            await redis_client.delete_pattern(f"ws:*:{key}")
         deleted_repo_analysis = await redis_client.delete_pattern(
             f"{repository_analysis_cache_prefix(sanitized_username)}*"
         )
+        deleted_repo_analysis += await redis_client.delete_pattern(
+            f"ws:*:{repository_analysis_cache_prefix(sanitized_username)}*"
+        )
         deleted_db_rows = 0
         deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_GITHUB_USER, sanitized_username)
-        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_STYLE_TAGS, sanitized_username, "en")
-        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_STYLE_TAGS, sanitized_username, "zh")
-        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_ROAST, sanitized_username, "en")
-        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_ROAST, sanitized_username, "zh")
-        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_TECH_SUMMARY, sanitized_username, "en")
-        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_TECH_SUMMARY, sanitized_username, "zh")
-        deleted_db_rows += await snapshot_store.delete_scope_prefix(
+        deleted_db_rows += await snapshot_store.delete_snapshot_all_scopes(ARTIFACT_AI_STYLE_TAGS, sanitized_username, "en")
+        deleted_db_rows += await snapshot_store.delete_snapshot_all_scopes(ARTIFACT_AI_STYLE_TAGS, sanitized_username, "zh")
+        deleted_db_rows += await snapshot_store.delete_snapshot_all_scopes(ARTIFACT_AI_ROAST, sanitized_username, "en")
+        deleted_db_rows += await snapshot_store.delete_snapshot_all_scopes(ARTIFACT_AI_ROAST, sanitized_username, "zh")
+        deleted_db_rows += await snapshot_store.delete_snapshot_all_scopes(ARTIFACT_AI_TECH_SUMMARY, sanitized_username, "en")
+        deleted_db_rows += await snapshot_store.delete_snapshot_all_scopes(ARTIFACT_AI_TECH_SUMMARY, sanitized_username, "zh")
+        deleted_db_rows += await snapshot_store.delete_scope_prefix_all_scopes(
             ARTIFACT_REPOSITORY_ANALYSIS,
             f"{sanitized_username}/",
         )
@@ -340,6 +383,16 @@ async def clear_user_cache(username: str):
                 "message": f"Failed to clear cache: {str(error)}",
             },
         )
+
+
+@app.post("/api/workspaces/ensure")
+async def ensure_workspace(request: Request):
+    workspace_scope = normalize_workspace_scope(request.headers.get(WORKSPACE_HEADER))
+    await ensure_workspace_scope(workspace_scope)
+    return {
+        "workspace_id": workspace_scope,
+        "registered": workspace_scope != "global",
+    }
 
 
 if __name__ == "__main__":

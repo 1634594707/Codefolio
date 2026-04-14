@@ -103,10 +103,6 @@ const repoNameArb = fc
   )
   .map(([o, r]) => `${o}/${r}`)
 
-const levelArb = fc.constantFrom('missing', 'weak', 'medium', 'strong') as fc.Arbitrary<
-  'missing' | 'weak' | 'medium' | 'strong'
->
-
 const effortArb = fc.constantFrom('S', 'M', 'L') as fc.Arbitrary<'S' | 'M' | 'L'>
 
 const reportArb = fc
@@ -350,7 +346,6 @@ describe('Unit tests: generateBenchmarkMarkdown', () => {
   })
 
   it('formats Feature_Matrix as a Markdown table with correct columns', () => {
-    const repos = ['user/mine', 'org/benchmark']
     const report = makeReport()
     const md = generateBenchmarkMarkdown(report, 'en')
 

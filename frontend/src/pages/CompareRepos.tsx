@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { ActionList } from '../components/ActionList'
 import { BenchmarkMatrix } from '../components/BenchmarkMatrix'
 import { HypothesisCards } from '../components/HypothesisCards'
+import { useApp } from '../context'
 import type { BenchmarkResponse, RepoProfile } from '../types/benchmark'
 import { isRequestAborted } from '../utils/axiosAbort'
 import { parseGitHubRepoInput } from '../utils/githubInput'
@@ -154,8 +155,18 @@ const labels = {
   },
 } as const
 
-function CompareModeTabs(_: CompareReposProps) {
-  return null
+function CompareModeTabs({ language }: CompareReposProps) {
+  const text = labels[language]
+  return (
+    <div className="repo-view-switcher" role="tablist" aria-label={text.title}>
+      <Link to="/compare/users" className="repo-view-chip" role="tab" aria-selected="false">
+        {text.tabsUsers}
+      </Link>
+      <Link to="/compare/repos" className="repo-view-chip active" role="tab" aria-selected="true">
+        {text.tabsRepos}
+      </Link>
+    </div>
+  )
 }
 
 function formatDate(value: string | null, language: 'en' | 'zh'): string {
@@ -177,6 +188,7 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function CompareRepos({ language }: CompareReposProps) {
+  const { saveBenchmarkWorkspaceEntry } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
   const text = labels[language]
   const [mineInput, setMineInput] = useState(searchParams.get('mine') ?? '')
@@ -193,6 +205,7 @@ export function CompareRepos({ language }: CompareReposProps) {
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [suggestError, setSuggestError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const filledBenchmarkCount = benchmarkInputs.filter((item) => item.trim()).length
 
   useEffect(() => {
     setMineInput(searchParams.get('mine') ?? '')
@@ -226,7 +239,16 @@ export function CompareRepos({ language }: CompareReposProps) {
           },
           { signal: abortController.signal },
         )
-        if (!cancelled) setResult(response.data)
+        if (!cancelled) {
+          setResult(response.data)
+          saveBenchmarkWorkspaceEntry({
+            username: mine.split('/')[0],
+            mine,
+            benchmarks,
+            language,
+            result: response.data,
+          })
+        }
       } catch (requestError) {
         if (isRequestAborted(requestError) || cancelled) return
         if (!cancelled) {
@@ -288,9 +310,17 @@ export function CompareRepos({ language }: CompareReposProps) {
   }
 
   const addSuggestionAsBenchmark = (fullName: string) => {
-    if (benchmarkInputs.length >= 3) return
-    if (benchmarkInputs.includes(fullName)) return
-    setBenchmarkInputs((current) => [...current.filter(Boolean), fullName].slice(0, 3))
+    if (benchmarkInputs.some((item) => item.toLowerCase() === fullName.toLowerCase())) return
+    setBenchmarkInputs((current) => {
+      const next = [...current]
+      const emptyIndex = next.findIndex((item) => !item.trim())
+      if (emptyIndex >= 0) {
+        next[emptyIndex] = fullName
+        return next
+      }
+      if (next.length >= 3) return next
+      return [...next, fullName]
+    })
     setShowSuggestions(false)
   }
 
@@ -450,7 +480,10 @@ export function CompareRepos({ language }: CompareReposProps) {
                         type="button"
                         className="compare-remove-btn"
                         onClick={() => addSuggestionAsBenchmark(s.full_name)}
-                        disabled={benchmarkInputs.length >= 3 || benchmarkInputs.includes(s.full_name)}
+                        disabled={
+                          (filledBenchmarkCount >= 3 && benchmarkInputs.every((item) => item.trim())) ||
+                          benchmarkInputs.some((item) => item.toLowerCase() === s.full_name.toLowerCase())
+                        }
                       >
                         {text.addSuggestion}
                       </button>
