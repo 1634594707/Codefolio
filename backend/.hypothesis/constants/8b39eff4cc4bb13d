@@ -1,0 +1,4 @@
+# file: D:\Administrator\Desktop\Project\Codefolio\backend\services\repository_profile_service.py
+# hypothesis_version: 6.151.14
+
+[3600, 21600, 86400, '+00:00', '/', 'Z', 'created_at', 'default_branch', 'description', 'fetched_at', 'forks', 'forks_count', 'full_name', 'has_code_of_conduct', 'has_contributing', 'has_docs_dir', 'has_examples_dir', 'has_issue_templates', 'has_license_file', 'has_quickstart', 'has_readme', 'has_screenshot', 'has_security_policy', 'homepage', 'language', 'license', 'name', 'open_issues_count', 'pushed_at', 'readme_badge_count', 'readme_h2_sections', 'readme_has_toc', 'readme_image_count', 'readme_sections', 'release_count_1y', 'spdx_id', 'stargazers_count', 'stars', 'topics', 'workflow_file_count']

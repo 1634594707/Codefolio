@@ -1,0 +1,4 @@
+# file: D:\Administrator\Desktop\Project\Codefolio\backend\config.py
+# hypothesis_version: 6.151.14
+
+[60.0, 3600, 12000, 21600, 86400, 604800, ',', '.env', '[', ']', 'codefolio.db', 'data', 'deepseek-chat', 'ignore', 'utf-8']

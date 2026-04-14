@@ -35,6 +35,7 @@ const labels = {
       'Analyze a developer, inspect repository content, let AI summarize the strongest projects, and curate the final selection for resume export.',
     heroPrimary: 'Start Picking Repositories',
     heroSecondary: 'Open Resume Export',
+    heroTertiary: 'Find similar benchmarks',
     workflowTitle: 'How it works',
     workflowStepOne: 'Analyze a GitHub user or open an existing workspace',
     workflowStepTwo: 'Review repositories with README, topics, and file structure signals',
@@ -89,6 +90,7 @@ const labels = {
       '先分析 GitHub 用户，再结合 README、topics、关键文件结构和 AI 分析，挑出最适合写进简历的仓库。',
     heroPrimary: '开始挑仓库',
     heroSecondary: '打开简历导出',
+    heroTertiary: '找相似项目对标',
     workflowTitle: '使用流程',
     workflowStepOne: '先分析一个 GitHub 用户，或打开已有工作区',
     workflowStepTwo: '查看仓库的 README、topics 和关键文件结构信号',
@@ -339,6 +341,20 @@ export function Overview({ language }: OverviewProps) {
               disabled={!currentUser}
             >
               {text.heroSecondary}
+            </button>
+            <button
+              type="button"
+              className="hero-action-btn"
+              onClick={() => {
+                const topRepo = suggestedRepos[0]
+                if (currentUser && topRepo) {
+                  navigate(`/compare/repos?mine=${encodeURIComponent(`${currentUser}/${topRepo.name}`)}`)
+                } else {
+                  navigate('/compare/repos')
+                }
+              }}
+            >
+              {text.heroTertiary}
             </button>
           </div>
         </div>

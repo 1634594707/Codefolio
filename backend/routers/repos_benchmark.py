@@ -5,18 +5,35 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import Literal
 
+import fastapi
+import starlette
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
-from benchmark_models import BenchmarkReport, FeatureMatrix
+from benchmark_models import BenchmarkReport, BenchmarkSuggestion, FeatureMatrix
+from cache_keys import repo_profile_cache_key, repository_profile_cache_key
+from services.ai_service import AIService
 from services.benchmark_analysis_service import BenchmarkAnalysisService
+from services.benchmark_recommendation_service import BenchmarkRecommendationService
 from services.github_service import GitHubService
 from services.repository_profile_service import RepositoryProfileService
+from utils.rate_limiter import benchmark_rate_limiter
+from utils.redis_client import redis_client
 
-router = APIRouter(prefix="/api/repos", tags=["repository-benchmarking"])
+try:
+    router = APIRouter(prefix="/api/repos", tags=["repository-benchmarking"])
+except TypeError as error:
+    if "on_startup" not in str(error):
+        raise
+    raise RuntimeError(
+        "FastAPI and Starlette are incompatible in the current environment. "
+        f"Detected fastapi={fastapi.__version__}, starlette={starlette.__version__}. "
+        "Reinstall backend dependencies with: pip install -r requirements.txt"
+    ) from error
 
 REPOSITORY_FULL_NAME_PATTERN = re.compile(
     r"^(?P<owner>[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/(?P<repo>[A-Za-z0-9._-]{1,100})$"
@@ -40,8 +57,25 @@ class RepositoryBenchmarkRequestModel(BaseModel):
     options: BenchmarkOptionsModel = Field(default_factory=BenchmarkOptionsModel)
 
 
+def _require_rate_limit(request: fastapi.Request) -> None:
+    """FastAPI dependency that enforces per-IP rate limiting on benchmark endpoints."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not benchmark_rate_limiter.is_allowed(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "rate_limit_exceeded",
+                "message": "Too many requests. Please wait before retrying.",
+            },
+        )
+
+
 profile_service = RepositoryProfileService()
-benchmark_service = BenchmarkAnalysisService(profile_service=profile_service)
+benchmark_service = BenchmarkAnalysisService(
+    profile_service=profile_service,
+    ai_service=AIService(),
+)
+recommendation_service = BenchmarkRecommendationService(profile_service=profile_service)
 
 
 def sanitize_repository_full_name(raw_full_name: str) -> str:
@@ -128,7 +162,7 @@ def _encode_report(report: BenchmarkReport) -> dict:
 
 
 @router.post("/profile")
-async def fetch_repository_profile(request: RepositoryProfileRequestModel):
+async def fetch_repository_profile(request: RepositoryProfileRequestModel, _rl: None = fastapi.Depends(_require_rate_limit)):
     full_name = sanitize_repository_full_name(request.full_name)
     try:
         profile = await profile_service.get_profile(full_name)
@@ -148,7 +182,7 @@ async def fetch_repository_profile(request: RepositoryProfileRequestModel):
 
 
 @router.post("/benchmark")
-async def benchmark_repositories(request: RepositoryBenchmarkRequestModel):
+async def benchmark_repositories(request: RepositoryBenchmarkRequestModel, _rl: None = fastapi.Depends(_require_rate_limit)):
     mine = sanitize_repository_full_name(request.mine)
     benchmarks = [sanitize_repository_full_name(item) for item in request.benchmarks]
     unique_benchmarks = list(dict.fromkeys(item for item in benchmarks if item != mine))
@@ -177,6 +211,7 @@ async def benchmark_repositories(request: RepositoryBenchmarkRequestModel):
             benchmarks=unique_benchmarks,
             language=request.language,
             include_narrative=request.options.include_narrative,
+            max_readme_chars=request.options.max_readme_chars_per_repo,
         )
         return _encode_report(report)
     except HTTPException:
@@ -199,10 +234,47 @@ async def suggest_benchmarks(
     limit: int = Query(3, ge=1, le=3),
     language: Literal["en", "zh"] = Query("en"),
 ):
-    raise HTTPException(
-        status_code=501,
-        detail={
-            "code": "not_implemented",
-            "message": f"Benchmark suggestions are not implemented yet for language={language} and limit={limit}.",
-        },
-    )
+    mine = sanitize_repository_full_name(mine)
+    try:
+        suggestions = await recommendation_service.suggest_benchmarks(mine, limit, language)
+        return {
+            "suggestions": [
+                {
+                    "full_name": s.full_name,
+                    "reason_code": s.reason_code,
+                    "reason_params": s.reason_params,
+                    "stars": s.stars,
+                }
+                for s in suggestions
+            ],
+            "fetched_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise map_exception_to_http(error) from error
+
+
+@router.delete("/cache/{owner}/{repo}")
+async def invalidate_repository_cache(owner: str, repo: str):
+    """Clear all cache keys for a specific repository (profile + benchmark results)."""
+    owner_lower = owner.strip().lower()
+    repo_lower = repo.strip().lower()
+
+    deleted = 0
+
+    # Delete the v1 profile cache key
+    profile_key = repo_profile_cache_key(owner_lower, repo_lower)
+    if await redis_client.delete(profile_key):
+        deleted += 1
+
+    # Delete the legacy profile cache key
+    legacy_profile_key = repository_profile_cache_key(f"{owner_lower}/{repo_lower}")
+    if await redis_client.delete(legacy_profile_key):
+        deleted += 1
+
+    # Delete any benchmark cache keys that reference this repo
+    deleted += await redis_client.delete_pattern(f"benchmark:v1:*")
+    deleted += await redis_client.delete_pattern(f"benchmark:v2:*")
+
+    return {"deleted_keys": deleted, "repository": f"{owner_lower}/{repo_lower}"}

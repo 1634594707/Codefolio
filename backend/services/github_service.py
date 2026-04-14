@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 from models import ContributionDay, Contributions, Repository, UserData
 from config import settings
+from database import ARTIFACT_GITHUB_USER, ARTIFACT_REPOSITORY_PROFILE, snapshot_store
 from utils.redis_client import redis_client
+from utils.token_redaction import redact_token
 from cache_keys import github_user_cache_key, github_user_cache_keys_to_clear, repository_profile_cache_key
 
 logger = logging.getLogger(__name__)
@@ -76,6 +78,16 @@ class GitHubService:
             logger.info(f"Cache hit for repository: {normalized_full_name}")
             return cached_data
 
+        db_snapshot = await snapshot_store.get_snapshot(
+            ARTIFACT_REPOSITORY_PROFILE,
+            normalized_full_name,
+            max_age_seconds=settings.GITHUB_CACHE_TTL,
+        )
+        if db_snapshot:
+            logger.info(f"Database hit for repository: {normalized_full_name}")
+            await redis_client.set(cache_key, db_snapshot, settings.GITHUB_CACHE_TTL)
+            return db_snapshot
+
         owner, repo = normalized_full_name.split("/", 1)
         logger.info(f"Cache miss for repository: {normalized_full_name}, fetching from GitHub API")
 
@@ -92,6 +104,15 @@ class GitHubService:
                 repo_response.raise_for_status()
                 repo_payload = repo_response.json()
 
+                # Requirement 20.1, 20.4: only analyze public repositories.
+                # Treat private repos identically to "not found" to avoid
+                # revealing their existence.
+                if repo_payload.get("private"):
+                    raise ValueError(
+                        f"GitHub repository '{normalized_full_name}' not found. "
+                        f"Please check the repository name and try again."
+                    )
+
                 root_entries = root_response.json() if root_response.status_code == 200 else []
                 workflow_entries = workflows_response.json() if workflows_response.status_code == 200 else []
                 issue_template_entries = issue_templates_response.json() if issue_templates_response.status_code == 200 else []
@@ -105,6 +126,7 @@ class GitHubService:
                     readme_payload=readme_payload if isinstance(readme_payload, dict) else None,
                 )
                 await redis_client.set(cache_key, profile, settings.GITHUB_CACHE_TTL)
+                await snapshot_store.upsert_snapshot(ARTIFACT_REPOSITORY_PROFILE, normalized_full_name, profile)
                 return profile
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
@@ -124,7 +146,7 @@ class GitHubService:
                         "Please try again later or use authentication to increase limits."
                     )
                 raise RuntimeError(
-                    f"GitHub API request failed with status {e.response.status_code}: {e.response.text}"
+                    f"GitHub API request failed with status {e.response.status_code}: {redact_token(e.response.text)}"
                 )
             except httpx.TimeoutException:
                 raise RuntimeError(
@@ -134,8 +156,8 @@ class GitHubService:
             except (ValueError, RuntimeError):
                 raise
             except Exception as e:
-                logger.error(f"Unexpected error fetching repository data: {e}")
-                raise RuntimeError(f"Failed to fetch GitHub repository data: {str(e)}")
+                logger.error(f"Unexpected error fetching repository data: {redact_token(str(e))}")
+                raise RuntimeError(f"Failed to fetch GitHub repository data: {redact_token(str(e))}")
     
     async def fetch_user_data(self, username: str) -> UserData:
         """
@@ -158,6 +180,16 @@ class GitHubService:
         if cached_data:
             logger.info(f"Cache hit for user: {username}")
             return self._deserialize_user_data(cached_data)
+
+        db_snapshot = await snapshot_store.get_snapshot(
+            ARTIFACT_GITHUB_USER,
+            username,
+            max_age_seconds=settings.GITHUB_CACHE_TTL,
+        )
+        if db_snapshot:
+            logger.info(f"Database hit for user: {username}")
+            await redis_client.set(cache_key, db_snapshot, settings.GITHUB_CACHE_TTL)
+            return self._deserialize_user_data(db_snapshot)
         
         logger.info(f"Cache miss for user: {username}, fetching from GitHub API")
         
@@ -208,6 +240,7 @@ class GitHubService:
                 # Cache the normalized data
                 serialized_data = self._serialize_user_data(user_data)
                 await redis_client.set(cache_key, serialized_data, settings.GITHUB_CACHE_TTL)
+                await snapshot_store.upsert_snapshot(ARTIFACT_GITHUB_USER, username, serialized_data)
                 
                 # Also invalidate legacy cache key formats
                 for legacy in github_user_cache_keys_to_clear(username):
@@ -232,7 +265,7 @@ class GitHubService:
                             "GitHub API rate limit exceeded. "
                             "Please try again later or use authentication to increase limits."
                         )
-                    raise RuntimeError(f"GitHub API access forbidden: {error_data}")
+                    raise RuntimeError(f"GitHub API access forbidden: {redact_token(str(error_data))}")
                 elif e.response.status_code == 404:
                     raise ValueError(
                         f"GitHub user '{username}' not found. "
@@ -241,7 +274,7 @@ class GitHubService:
                 else:
                     raise RuntimeError(
                         f"GitHub API request failed with status {e.response.status_code}: "
-                        f"{e.response.text}"
+                        f"{redact_token(e.response.text)}"
                     )
             except httpx.TimeoutException:
                 raise RuntimeError(
@@ -252,8 +285,8 @@ class GitHubService:
                 # Re-raise our custom errors
                 raise
             except Exception as e:
-                logger.error(f"Unexpected error fetching GitHub data: {e}")
-                raise RuntimeError(f"Failed to fetch GitHub data: {str(e)}")
+                logger.error(f"Unexpected error fetching GitHub data: {redact_token(str(e))}")
+                raise RuntimeError(f"Failed to fetch GitHub data: {redact_token(str(e))}")
 
     def _build_graphql_query(self) -> str:
         """
@@ -1123,8 +1156,8 @@ class GitHubService:
                 }
                 
             except Exception as e:
-                logger.error(f"Failed to check rate limit: {e}")
-                raise RuntimeError(f"Rate limit check failed: {str(e)}")
+                logger.error(f"Failed to check rate limit: {redact_token(str(e))}")
+                raise RuntimeError(f"Rate limit check failed: {redact_token(str(e))}")
     
     @staticmethod
     def create_error_response(error: Exception) -> Dict[str, Any]:

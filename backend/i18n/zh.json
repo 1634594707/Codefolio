@@ -1,0 +1,14 @@
+{
+  "benchmark": {
+    "dimension": {
+      "positioning": "定位表达",
+      "first_impression": "第一印象",
+      "onboarding": "上手体验",
+      "engineering_quality": "工程质量",
+      "releases": "发布节奏",
+      "community": "社区协作",
+      "discovery": "可发现性",
+      "compliance": "许可合规"
+    }
+  }
+}

@@ -28,6 +28,22 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_DB: int = 0
 
+    # Durable snapshot storage
+    DATABASE_PATH: str = str(_BACKEND_ROOT / "data" / "codefolio.db")
+
+    # Snapshot freshness / differential TTL strategy (Req 13.3)
+    REPOSITORY_METADATA_TTL: int = 3600       # 1 hour  – repo metadata
+    REPOSITORY_README_TTL: int = 21600        # 6 hours – README content
+    REPOSITORY_STAR_HISTORY_TTL: int = 86400  # 24 hours – star history (Phase 2+)
+
+    # Rate limiting for benchmark endpoints (Req 20.5)
+    BENCHMARK_RATE_LIMIT_MAX_REQUESTS: int = 10   # max requests per window
+    BENCHMARK_RATE_LIMIT_WINDOW_SECONDS: int = 60  # sliding window in seconds
+
+    # LLM narrative generation
+    LLM_NARRATIVE_ENABLED: bool = True
+    LLM_MAX_README_CHARS_PER_REPO: int = 12000  # truncation limit per repo README
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 

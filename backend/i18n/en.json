@@ -1,0 +1,14 @@
+{
+  "benchmark": {
+    "dimension": {
+      "positioning": "Positioning",
+      "first_impression": "First impression",
+      "onboarding": "Onboarding",
+      "engineering_quality": "Engineering quality",
+      "releases": "Releases",
+      "community": "Community",
+      "discovery": "Discovery",
+      "compliance": "Compliance"
+    }
+  }
+}

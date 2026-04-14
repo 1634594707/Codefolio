@@ -4,6 +4,8 @@ import axios from 'axios'
 import { useApp } from '../context'
 import { isRequestAborted } from '../utils/axiosAbort'
 import type { GenerateResponse, LocalizedOutput as FullLocalizedOutput } from '../types/generate'
+import type { BenchmarkResponse } from '../types/benchmark'
+import { generateBenchmarkMarkdown } from '../utils/benchmarkExport'
 
 interface ExportProps {
   language: 'en' | 'zh'
@@ -29,6 +31,12 @@ const labels = {
     error: 'Failed to load data',
     noUser: 'Enter a GitHub username to export',
     preview: 'Preview',
+    benchmarkTitle: 'Repository Benchmark',
+    benchmarkDesc: 'Append a benchmark report to your export',
+    includeBenchmark: 'Include benchmark report',
+    benchmarkLoading: 'Loading benchmark...',
+    benchmarkError: 'Failed to load benchmark report',
+    benchmarkNone: 'No benchmark available. Run a comparison on the Repositories tab first.',
   },
   zh: {
     title: '导出',
@@ -47,6 +55,12 @@ const labels = {
     error: '加载数据失败',
     noUser: '输入 GitHub 用户名以导出',
     preview: '预览',
+    benchmarkTitle: '仓库对标',
+    benchmarkDesc: '将对标报告附加到导出内容',
+    includeBenchmark: '包含对标报告',
+    benchmarkLoading: '加载对标报告中...',
+    benchmarkError: '加载对标报告失败',
+    benchmarkNone: '暂无对标报告。请先在仓库页面运行对标分析。',
   },
 }
 
@@ -127,6 +141,10 @@ export function Export({ language }: ExportProps) {
   const [markdownCopied, setMarkdownCopied] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportingCard, setExportingCard] = useState(false)
+  const [includeBenchmark, setIncludeBenchmark] = useState(false)
+  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResponse | null>(null)
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false)
+  const [benchmarkError, setBenchmarkError] = useState('')
   const resumeRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const text = labels[language]
@@ -184,6 +202,49 @@ export function Export({ language }: ExportProps) {
       abortController.abort()
     }
   }, [username, contentLanguage, getGenerateCache, cacheGenerateResult, text.error])
+
+  // Fetch benchmark report when user opts in, using mine/b URL params
+  useEffect(() => {
+    const mine = searchParams.get('mine') ?? ''
+    const benchmarks = (searchParams.get('b') ?? '').split(',').filter(Boolean)
+    if (!includeBenchmark || !mine || benchmarks.length === 0) {
+      setBenchmarkResult(null)
+      setBenchmarkError('')
+      return
+    }
+
+    let cancelled = false
+    const abortController = new AbortController()
+
+    const fetchBenchmark = async () => {
+      setBenchmarkLoading(true)
+      setBenchmarkError('')
+      try {
+        const response = await axios.post<BenchmarkResponse>(
+          `${API_BASE_URL}/api/repos/benchmark`,
+          {
+            mine,
+            benchmarks,
+            language: contentLanguage,
+            options: { include_narrative: false, max_readme_chars_per_repo: 12000 },
+          },
+          { signal: abortController.signal },
+        )
+        if (!cancelled) setBenchmarkResult(response.data)
+      } catch (err) {
+        if (isRequestAborted(err) || cancelled) return
+        if (!cancelled) setBenchmarkError(text.benchmarkError)
+      } finally {
+        if (!cancelled) setBenchmarkLoading(false)
+      }
+    }
+
+    void fetchBenchmark()
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
+  }, [includeBenchmark, searchParams, contentLanguage, text.benchmarkError])
 
   const exportPdf = async () => {
     if (!resumeRef.current || !data) return
@@ -315,7 +376,12 @@ export function Export({ language }: ExportProps) {
           .join('\n\n')}`
       : ''
 
-  const resumeMarkdown = `${activeOutput.resume_markdown}${selectedProjectsMarkdown}`
+  const benchmarkMarkdown =
+    includeBenchmark && benchmarkResult
+      ? `\n\n---\n\n${generateBenchmarkMarkdown(benchmarkResult, language)}`
+      : ''
+
+  const resumeMarkdown = `${activeOutput.resume_markdown}${selectedProjectsMarkdown}${benchmarkMarkdown}`
   const resumeHtml = markdownToHtml(resumeMarkdown)
 
   return (
@@ -374,6 +440,40 @@ export function Export({ language }: ExportProps) {
             {markdownCopied ? text.markdownCopied : text.copyMarkdown}
           </button>
         </div>
+      </div>
+
+      <div className="export-card" style={{ marginBottom: '1.5rem' }}>
+        <div className="export-icon markdown-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+            <line x1="9" y1="21" x2="9" y2="9" />
+          </svg>
+        </div>
+        <h3 className="export-title">{text.benchmarkTitle}</h3>
+        <p className="export-desc">{text.benchmarkDesc}</p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.5rem' }}>
+          <input
+            type="checkbox"
+            checked={includeBenchmark}
+            onChange={(e) => setIncludeBenchmark(e.target.checked)}
+          />
+          <span>{text.includeBenchmark}</span>
+        </label>
+        {includeBenchmark && (
+          <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+            {benchmarkLoading && <p>{text.benchmarkLoading}</p>}
+            {benchmarkError && <p style={{ color: 'var(--color-error, #ef4444)' }}>{benchmarkError}</p>}
+            {!benchmarkLoading && !benchmarkError && !benchmarkResult && (
+              <p style={{ opacity: 0.7 }}>{text.benchmarkNone}</p>
+            )}
+            {benchmarkResult && (
+              <p style={{ opacity: 0.7 }}>
+                {Object.keys(benchmarkResult.profiles).join(' vs ')}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="preview-section">

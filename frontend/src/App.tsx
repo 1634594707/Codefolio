@@ -64,6 +64,7 @@ const labels = {
     navInsights: 'AI Analysis',
     navExport: 'Export',
     navCompare: 'Compare',
+    navBenchmark: 'Benchmark Repos',
     workspaceSynced: 'Workspace Synced',
     placeholder: 'Paste @username, profile URL, or repo URL...',
     generate: 'Analyze',
@@ -99,6 +100,7 @@ const labels = {
     navInsights: 'AI 分析',
     navExport: '导出',
     navCompare: '对比',
+    navBenchmark: '仓库对标',
     workspaceSynced: '工作区已同步',
     placeholder: '搜索 GitHub 用户名...',
     generate: '分析',
@@ -197,6 +199,14 @@ const ExportIcon = () => (
 const CompareIcon = () => (
   <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 2v20M2 12h20M4 4l16 16M20 4L4 20" />
+  </svg>
+)
+
+const BenchmarkIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="12" width="4" height="9" rx="1" />
+    <rect x="10" y="7" width="4" height="14" rx="1" />
+    <rect x="17" y="3" width="4" height="18" rx="1" />
   </svg>
 )
 
@@ -529,6 +539,7 @@ function Layout() {
     if (path.startsWith('/repositories')) return 'repositories'
     if (path.startsWith('/analysis')) return 'analysis'
     if (path.startsWith('/export')) return 'export'
+    if (path === '/compare/repos') return 'benchmark'
     if (path.startsWith('/compare')) return 'compare'
     return 'overview'
   }
@@ -587,6 +598,13 @@ function Layout() {
           >
             <CompareIcon />
             <span>{text.navCompare}</span>
+          </Link>
+          <Link
+            to="/compare/repos"
+            className={`side-link ${activeNav === 'benchmark' ? 'side-link-active' : ''}`}
+          >
+            <BenchmarkIcon />
+            <span>{text.navBenchmark}</span>
           </Link>
         </nav>
 

@@ -17,6 +17,13 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+# Differential TTL strategy (Requirement 13.3)
+# Metadata changes infrequently; README content is refreshed less often;
+# star history (Phase 2+) is the most stable and cached longest.
+TTL_METADATA: int = getattr(settings, "REPOSITORY_METADATA_TTL", 3600)       # 1 hour
+TTL_README: int = getattr(settings, "REPOSITORY_README_TTL", 21600)           # 6 hours
+TTL_STAR_HISTORY: int = getattr(settings, "REPOSITORY_STAR_HISTORY_TTL", 86400)  # 24 hours (Phase 2+)
+
 
 class RepositoryProfileService:
     """Service for fetching and caching repository profiles."""
@@ -127,7 +134,7 @@ class RepositoryProfileService:
         serialized = self._serialize_profile(profile)
         
         # Use metadata TTL (1 hour as per requirements)
-        ttl = getattr(settings, 'REPOSITORY_METADATA_TTL', 3600)
+        ttl = TTL_METADATA
         await redis_client.set(cache_key, serialized, ttl)
         logger.info(f"Cached repository profile: {normalized_name}")
         

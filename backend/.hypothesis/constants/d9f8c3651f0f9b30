@@ -1,0 +1,4 @@
+# file: D:\Administrator\Desktop\Project\Codefolio\backend\services\skills_inference.py
+# hypothesis_version: 6.151.14
+
+[0.0, 0.05, 0.1, 0.15, 0.2, 'Angular', 'Assembly', 'Bash', 'C', 'C#', 'C++', 'CSS', 'CloudFormation', 'Dart', 'Data & ML', 'Django', 'Docker', 'Expert', 'Express', 'Familiar', 'FastAPI', 'Flutter', 'Go', 'HTML', 'Java', 'JavaScript', 'Julia', 'Kotlin', 'Kubernetes', 'Learning', 'Mobile', 'Mobile Development', 'Node.js', 'Objective-C', 'PHP', 'Proficient', 'Python', 'R', 'React', 'React Native', 'Ruby', 'Rust', 'SQL', 'Scala', 'Shell', 'Spring', 'Svelte', 'Swift', 'Systems & Low-level', 'Systems Programming', 'Terraform', 'TypeScript', 'Vue', 'Web Backend', 'Web Frontend']

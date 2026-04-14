@@ -70,6 +70,7 @@ class RepositoryAIAnalysis:
     summary: str
     highlights: List[str]
     keywords: List[str] = field(default_factory=list)
+    evidence: List[str] = field(default_factory=list)
 
 @dataclass
 class GenerateRequest:

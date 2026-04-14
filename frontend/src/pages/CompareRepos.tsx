@@ -1,102 +1,27 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
+import { ActionList } from '../components/ActionList'
+import { BenchmarkMatrix } from '../components/BenchmarkMatrix'
+import { HypothesisCards } from '../components/HypothesisCards'
+import type { BenchmarkResponse, RepoProfile } from '../types/benchmark'
 import { isRequestAborted } from '../utils/axiosAbort'
 import { parseGitHubRepoInput } from '../utils/githubInput'
 import { generateBenchmarkMarkdown } from '../utils/benchmarkExport'
+import { formatCacheAge, isStale } from '../utils/formatCacheAge'
 
 interface CompareReposProps {
   language: 'en' | 'zh'
 }
 
-interface RepoProfile {
-  full_name: string
-  description: string | null
-  stars: number
-  forks: number
-  language: string | null
-  topics: string[]
-  license: string | null
-  default_branch: string | null
-  created_at: string | null
-  pushed_at: string | null
-  has_readme: boolean
-  readme_sections: string[]
-  has_license_file: boolean
-  workflow_file_count: number
-  has_contributing: boolean
-  has_code_of_conduct: boolean
-  has_security_policy: boolean
-  has_issue_templates: boolean
-  has_screenshot: boolean
-  has_quickstart: boolean
-  has_examples_dir: boolean
-  has_docs_dir: boolean
-  homepage: string | null
-  open_issues_count: number
-  fetched_at: string
-}
-
-interface FeatureCell {
-  repo: string
-  level: 'missing' | 'weak' | 'medium' | 'strong'
-  score: number
-  raw: Record<string, boolean | number | string>
-}
-
-interface FeatureRow {
-  dimension_id: string
-  label_key: string
-  label: string
-  cells: FeatureCell[]
-}
-
-interface Hypothesis {
-  hypothesis_id: string
-  title: string
-  category: string
-  evidence: Array<{
-    type: string
-    detail: string
-    repo: string
-  }>
-  transferability: 'high' | 'medium' | 'low'
-  caveats: string[]
-  confidence: string
-}
-
-interface ActionItem {
-  action_id: string
-  dimension: string
-  title: string
-  rationale: string
-  effort: 'S' | 'M' | 'L'
-  impact: number
-  priority_score: number
-  checklist: string[]
-  suggested_deadline: string
-}
-
-interface BenchmarkResponse {
-  bucket: {
-    label: string
-    warning: string | null
-  }
-  profiles: Record<string, RepoProfile>
-  feature_matrix: {
-    rows: FeatureRow[]
-  }
-  hypotheses: Hypothesis[]
-  actions: ActionItem[]
-  narrative: {
-    summary: string
-    disclaimer: string
-  } | null
-  generated_at: string
-  llm_calls: number
-}
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+
+interface BenchmarkSuggestion {
+  full_name: string
+  reason_code: string
+  reason_params: Record<string, string | number | string[]>
+  stars: number
+}
 
 const labels = {
   en: {
@@ -136,10 +61,36 @@ const labels = {
     copyMarkdown: 'Copy Markdown',
     copied: 'Copied',
     downloadMarkdown: 'Download .md',
+    details: 'View details',
+    noDetails: 'No raw signals available.',
+    sortBy: 'Sort by',
+    filterBy: 'Filter by',
+    sortPriority: 'Priority',
+    sortEffort: 'Effort',
+    sortImpact: 'Impact',
+    allDimensions: 'All dimensions',
+    markComplete: 'Mark complete',
+    timeline7d: '7 day focus',
+    timeline30d: '30 day plan',
+    timeline90d: '90 day backlog',
+    noActions: 'No action items generated.',
+    filterCategory: 'Category',
+    filterTransferability: 'Transferability',
+    allCategories: 'All categories',
+    allTransferability: 'All levels',
+    showEvidence: 'Show evidence',
+    noHypotheses: 'No hypotheses generated.',
+    staleWarning: 'This data is over 7 days old. Consider refreshing.',
+    refresh: 'Refresh',
+    suggestBenchmarks: 'Suggest Benchmarks',
+    suggesting: 'Finding suggestions...',
+    suggestError: 'Failed to fetch suggestions.',
+    noSuggestions: 'No suggestions found.',
+    addSuggestion: 'Add',
   },
   zh: {
     title: '仓库对标',
-    subtitle: '把你的仓库与更强的标杆仓库放在一起比较，并直接生成改进动作。',
+    subtitle: '把你的仓库与更强的标杆仓库放在一起比较，并直接生成改进行动。',
     tabsUsers: '开发者',
     tabsRepos: '仓库',
     mineLabel: '我的仓库',
@@ -154,12 +105,12 @@ const labels = {
     empty: '先输入一个你想提升的仓库，再添加最多 3 个标杆仓库。',
     invalidMine: '请输入有效的 GitHub 仓库，格式如 owner/repo。',
     invalidBenchmarks: '请至少填写一个有效的标杆仓库。',
-    duplicateBenchmarks: '标杆仓库必须唯一，且不能与我的仓库相同。',
+    duplicateBenchmarks: '标杆仓库必须唯一，且不能与你的仓库相同。',
     loadError: '仓库对标生成失败。',
     overview: '概览',
     matrix: '差距矩阵',
     actions: '行动项',
-    evidence: '这些仓库为什么更突出',
+    evidence: '这些仓库为何更突出',
     statusMine: '我的仓库',
     score: '评分',
     quickFacts: '关键信号',
@@ -174,22 +125,37 @@ const labels = {
     copyMarkdown: '复制 Markdown',
     copied: '已复制',
     downloadMarkdown: '下载 .md',
+    details: '查看详情',
+    noDetails: '暂无原始信号。',
+    sortBy: '排序方式',
+    filterBy: '筛选方式',
+    sortPriority: '优先级',
+    sortEffort: '投入成本',
+    sortImpact: '影响',
+    allDimensions: '全部维度',
+    markComplete: '标记完成',
+    timeline7d: '7 天聚焦',
+    timeline30d: '30 天计划',
+    timeline90d: '90 天积压',
+    noActions: '暂无生成的行动项。',
+    filterCategory: '类别',
+    filterTransferability: '可迁移性',
+    allCategories: '全部类别',
+    allTransferability: '全部等级',
+    showEvidence: '显示依据',
+    noHypotheses: '暂无生成的假设。',
+    staleWarning: '此数据已超过 7 天，建议刷新。',
+    refresh: '刷新',
+    suggestBenchmarks: '推荐标杆仓库',
+    suggesting: '正在查找推荐...',
+    suggestError: '获取推荐失败。',
+    noSuggestions: '未找到推荐仓库。',
+    addSuggestion: '添加',
   },
 } as const
 
-function CompareModeTabs({ language }: CompareReposProps) {
-  const text = labels[language]
-
-  return (
-    <div className="compare-mode-tabs" role="tablist" aria-label={text.title}>
-      <Link to="/compare/users" className="compare-mode-tab">
-        {text.tabsUsers}
-      </Link>
-      <Link to="/compare/repos" className="compare-mode-tab compare-mode-tab-active">
-        {text.tabsRepos}
-      </Link>
-    </div>
-  )
+function CompareModeTabs(_: CompareReposProps) {
+  return null
 }
 
 function formatDate(value: string | null, language: 'en' | 'zh'): string {
@@ -203,13 +169,6 @@ function formatDate(value: string | null, language: 'en' | 'zh'): string {
   })
 }
 
-function levelClass(level: FeatureCell['level']): string {
-  if (level === 'strong') return 'compare-level-strong'
-  if (level === 'medium') return 'compare-level-medium'
-  if (level === 'weak') return 'compare-level-weak'
-  return 'compare-level-missing'
-}
-
 function extractErrorMessage(error: unknown, fallback: string): string {
   if (!axios.isAxiosError(error)) return fallback
   const detail = error.response?.data?.detail
@@ -221,19 +180,25 @@ export function CompareRepos({ language }: CompareReposProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const text = labels[language]
   const [mineInput, setMineInput] = useState(searchParams.get('mine') ?? '')
-  const [benchmarkInputs, setBenchmarkInputs] = useState<string[]>(
-    (searchParams.get('b') ?? '').split(',').filter(Boolean).slice(0, 3),
-  )
-  const [includeNarrative, setIncludeNarrative] = useState(searchParams.get('n') === '1')
+  const [benchmarkInputs, setBenchmarkInputs] = useState<string[]>(() => {
+    const fromUrl = (searchParams.get('b') ?? '').split(',').filter(Boolean).slice(0, 3)
+    return fromUrl.length > 0 ? fromUrl : ['']
+  })
+  const [includeNarrative, setIncludeNarrative] = useState(searchParams.get('n') !== '0')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<BenchmarkResponse | null>(null)
   const [markdownCopied, setMarkdownCopied] = useState(false)
+  const [suggestions, setSuggestions] = useState<BenchmarkSuggestion[]>([])
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [suggestError, setSuggestError] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
     setMineInput(searchParams.get('mine') ?? '')
-    setBenchmarkInputs((searchParams.get('b') ?? '').split(',').filter(Boolean).slice(0, 3))
-    setIncludeNarrative(searchParams.get('n') === '1')
+    const fromUrl = (searchParams.get('b') ?? '').split(',').filter(Boolean).slice(0, 3)
+    setBenchmarkInputs(fromUrl.length > 0 ? fromUrl : [''])
+    setIncludeNarrative(searchParams.get('n') !== '0')
   }, [searchParams])
 
   useEffect(() => {
@@ -281,7 +246,12 @@ export function CompareRepos({ language }: CompareReposProps) {
   }, [language, searchParams, text.loadError])
 
   const addBenchmarkField = () => {
-    setBenchmarkInputs((current) => (current.length >= 3 ? current : [...current, '']))
+    setBenchmarkInputs((current) => {
+      if (current.length >= 3) return current
+      // don't add another empty field if the last one is already empty
+      if (current[current.length - 1] === '') return current
+      return [...current, '']
+    })
   }
 
   const updateBenchmarkField = (index: number, value: string) => {
@@ -290,6 +260,38 @@ export function CompareRepos({ language }: CompareReposProps) {
 
   const removeBenchmarkField = (index: number) => {
     setBenchmarkInputs((current) => current.filter((_, itemIndex) => itemIndex !== index))
+  }
+
+  const handleSuggest = async () => {
+    const parsedMine = parseGitHubRepoInput(mineInput)
+    if (parsedMine.kind !== 'repo') {
+      setError(text.invalidMine)
+      return
+    }
+    setSuggestLoading(true)
+    setSuggestError('')
+    setShowSuggestions(true)
+    try {
+      const response = await axios.get<{ suggestions: BenchmarkSuggestion[] }>(
+        `${API_BASE_URL}/api/repos/suggest-benchmarks`,
+        { params: { mine: parsedMine.fullName, limit: 3 } },
+      )
+      setSuggestions(response.data.suggestions)
+    } catch (requestError) {
+      if (!isRequestAborted(requestError)) {
+        setSuggestError(extractErrorMessage(requestError, text.suggestError))
+        setSuggestions([])
+      }
+    } finally {
+      setSuggestLoading(false)
+    }
+  }
+
+  const addSuggestionAsBenchmark = (fullName: string) => {
+    if (benchmarkInputs.length >= 3) return
+    if (benchmarkInputs.includes(fullName)) return
+    setBenchmarkInputs((current) => [...current.filter(Boolean), fullName].slice(0, 3))
+    setShowSuggestions(false)
   }
 
   const handleSubmit = () => {
@@ -324,14 +326,29 @@ export function CompareRepos({ language }: CompareReposProps) {
     })
   }
 
-  const orderedProfiles = useMemo(() => {
+  const handleRefresh = () => {
+    const mine = searchParams.get('mine') ?? ''
+    const benchmarks = (searchParams.get('b') ?? '').split(',').filter(Boolean)
+    if (!mine || benchmarks.length === 0) return
+    setResult(null)
+    setSearchParams({
+      mine,
+      b: benchmarks.join(','),
+      ...(searchParams.get('n') === '1' ? { n: '1' } : {}),
+      force: Date.now().toString(),
+    })
+  }
+
+  const orderedProfiles = useMemo<RepoProfile[]>(() => {
     if (!result) return []
     const mine = searchParams.get('mine') ?? ''
     const benchmarks = (searchParams.get('b') ?? '').split(',').filter(Boolean)
-    return [mine, ...benchmarks].map((name) => result.profiles[name.toLowerCase()] ?? result.profiles[name]).filter(Boolean)
+    return [mine, ...benchmarks]
+      .map((name) => result.profiles[name.toLowerCase()] ?? result.profiles[name])
+      .filter((profile): profile is RepoProfile => Boolean(profile))
   }, [result, searchParams])
 
-  const visibleBenchmarkInputs = benchmarkInputs.length > 0 ? benchmarkInputs : ['']
+  const visibleBenchmarkInputs = benchmarkInputs
   const markdown = result ? generateBenchmarkMarkdown(result, language) : ''
 
   const copyMarkdown = async () => {
@@ -404,11 +421,45 @@ export function CompareRepos({ language }: CompareReposProps) {
               <button type="button" className="compare-remove-btn" onClick={addBenchmarkField} disabled={benchmarkInputs.length >= 3}>
                 {text.addBenchmark}
               </button>
+              <button type="button" className="compare-remove-btn" onClick={handleSuggest} disabled={suggestLoading}>
+                {suggestLoading ? text.suggesting : text.suggestBenchmarks}
+              </button>
               <button type="button" className="compare-add-btn repo-benchmark-submit" onClick={handleSubmit} disabled={loading}>
                 {loading ? text.comparing : text.compare}
               </button>
             </div>
           </div>
+
+          {showSuggestions && (
+            <div className="repo-suggestions-panel">
+              {suggestLoading && <p className="compare-hint">{text.suggesting}</p>}
+              {suggestError && <p className="compare-hint">{suggestError}</p>}
+              {!suggestLoading && !suggestError && suggestions.length === 0 && (
+                <p className="compare-hint">{text.noSuggestions}</p>
+              )}
+              {!suggestLoading && suggestions.length > 0 && (
+                <ul className="repo-suggestions-list">
+                  {suggestions.map((s) => (
+                    <li key={s.full_name} className="repo-suggestion-item">
+                      <div className="repo-suggestion-info">
+                        <strong>{s.full_name}</strong>
+                        <span className="compare-tag">{s.reason_code}</span>
+                        <span className="compare-hint">★{s.stars.toLocaleString()}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="compare-remove-btn"
+                        onClick={() => addSuggestionAsBenchmark(s.full_name)}
+                        disabled={benchmarkInputs.length >= 3 || benchmarkInputs.includes(s.full_name)}
+                      >
+                        {text.addSuggestion}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {!result && !loading && !error && <p className="compare-hint">{text.empty}</p>}
@@ -427,6 +478,14 @@ export function CompareRepos({ language }: CompareReposProps) {
 
       {result && (
         <>
+          {isStale(result.generated_at) && (
+            <div className="repo-stale-warning" role="alert">
+              <span>{text.staleWarning}</span>
+              <button type="button" className="compare-remove-btn" onClick={handleRefresh}>
+                {text.refresh}
+              </button>
+            </div>
+          )}
           <section className="repo-benchmark-summary">
             <article className="repo-summary-card repo-summary-card-primary">
               <span className="compare-insight-kicker">{text.overview}</span>
@@ -436,7 +495,7 @@ export function CompareRepos({ language }: CompareReposProps) {
             <article className="repo-summary-card">
               <span className="compare-insight-kicker">{text.quickFacts}</span>
               <p>{result.bucket.warning ?? result.narrative?.disclaimer ?? '-'}</p>
-              <p>{text.generatedAt}: {formatDate(result.generated_at, language)}</p>
+              <p>{text.generatedAt}: {formatDate(result.generated_at, language)} · {formatCacheAge(result.generated_at)}</p>
               <div className="repo-benchmark-buttons">
                 <button type="button" className="compare-remove-btn" onClick={copyMarkdown}>
                   {markdownCopied ? text.copied : text.copyMarkdown}
@@ -456,13 +515,16 @@ export function CompareRepos({ language }: CompareReposProps) {
                     <span className="compare-insight-kicker">{index === 0 ? text.statusMine : `${text.benchmarkLabel} ${index}`}</span>
                     <h3>{profile.full_name}</h3>
                   </div>
-                  <span className="repo-profile-stars">★ {profile.stars.toLocaleString()}</span>
+                  <span className="repo-profile-stars">★{profile.stars.toLocaleString()}</span>
                 </div>
                 <p>{profile.description || text.noDescription}</p>
                 <div className="repo-profile-meta">
                   <span>{profile.language || 'Code'}</span>
                   <span>{text.workflows}: {profile.workflow_file_count}</span>
                   <span>{text.lastUpdated}: {formatDate(profile.pushed_at, language)}</span>
+                </div>
+                <div className="repo-profile-meta">
+                  <span className="repo-profile-fetched-at">{formatCacheAge(profile.fetched_at)}</span>
                 </div>
                 <div className="repo-profile-tags">
                   {(profile.topics ?? []).slice(0, 6).map((topic) => (
@@ -483,81 +545,52 @@ export function CompareRepos({ language }: CompareReposProps) {
 
           <section className="compare-chart-section">
             <h3 className="compare-chart-title">{text.matrix}</h3>
-            <div className="repo-matrix">
-              {result.feature_matrix.rows.map((row) => (
-                <div key={row.dimension_id} className="repo-matrix-row">
-                  <div className="repo-matrix-label">{row.label}</div>
-                  <div className="repo-matrix-cells">
-                    {row.cells.map((cell) => (
-                      <div key={`${row.dimension_id}-${cell.repo}`} className={`repo-matrix-cell ${levelClass(cell.level)}`}>
-                        <strong>{cell.repo}</strong>
-                        <span>{text.score}: {cell.score}</span>
-                        <span>{cell.level}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <BenchmarkMatrix
+              rows={result.feature_matrix.rows}
+              scoreLabel={text.score}
+              detailsLabel={text.details}
+              emptyLabel={text.noDetails}
+            />
           </section>
 
           <section className="compare-chart-section">
             <h3 className="compare-chart-title">{text.actions}</h3>
-            <div className="repo-actions-grid">
-              {result.actions.map((action) => (
-                <article key={action.action_id} className="repo-action-card">
-                  <div className="repo-action-head">
-                    <h4>{action.title}</h4>
-                    <span>{action.effort} / {action.impact}</span>
-                  </div>
-                  <p>{action.rationale}</p>
-                  <div className="repo-profile-flags">
-                    {action.effort === 'S' && action.impact >= 4 && <span className="repo-flag active">{text.quickWin}</span>}
-                    <span className="repo-flag">{action.suggested_deadline}</span>
-                  </div>
-                  <div className="repo-action-checks">
-                    {action.checklist.map((item) => (
-                      <span key={item} className="repo-check-item">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
+            <ActionList
+              actions={result.actions}
+              language={language}
+              labels={{
+                sortBy: text.sortBy,
+                filterBy: text.filterBy,
+                sortPriority: text.sortPriority,
+                sortEffort: text.sortEffort,
+                sortImpact: text.sortImpact,
+                allDimensions: text.allDimensions,
+                quickWin: text.quickWin,
+                complete: text.markComplete,
+                timeline7d: text.timeline7d,
+                timeline30d: text.timeline30d,
+                timeline90d: text.timeline90d,
+                noActions: text.noActions,
+              }}
+            />
           </section>
 
           <section className="compare-chart-section">
             <h3 className="compare-chart-title">{text.evidence}</h3>
-            <div className="repo-hypothesis-grid">
-              {result.hypotheses.map((hypothesis) => (
-                <article key={hypothesis.hypothesis_id} className="repo-hypothesis-card">
-                  <h4>{hypothesis.title}</h4>
-                  <div className="repo-profile-flags">
-                    <span className="repo-flag">{text.transferability}: {hypothesis.transferability}</span>
-                    <span className="repo-flag">{text.confidence}: {hypothesis.confidence}</span>
-                  </div>
-                  <div className="repo-evidence-list">
-                    {hypothesis.evidence.map((evidence) => (
-                      <div key={`${hypothesis.hypothesis_id}-${evidence.repo}-${evidence.detail}`} className="repo-evidence-item">
-                        <strong>{evidence.repo}</strong>
-                        <span>{evidence.detail}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {hypothesis.caveats.length > 0 && (
-                    <div className="repo-evidence-list">
-                      {hypothesis.caveats.map((caveat) => (
-                        <div key={caveat} className="repo-evidence-item">
-                          <strong>{text.disclaimer}</strong>
-                          <span>{caveat}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
+            <HypothesisCards
+              hypotheses={result.hypotheses}
+              labels={{
+                transferability: text.transferability,
+                confidence: text.confidence,
+                disclaimer: text.disclaimer,
+                filterCategory: text.filterCategory,
+                filterTransferability: text.filterTransferability,
+                allCategories: text.allCategories,
+                allTransferability: text.allTransferability,
+                evidence: text.showEvidence,
+                noHypotheses: text.noHypotheses,
+              }}
+            />
           </section>
 
           {result.narrative && (

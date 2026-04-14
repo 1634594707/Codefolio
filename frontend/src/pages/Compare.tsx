@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
   BarChart,
@@ -76,11 +76,11 @@ const labels = {
     tiedMatch: 'This matchup is extremely close.',
     edgeSummary: 'Largest gap currently shows up in',
     dimensions: {
-      impact: 'Impact',
-      contribution: 'Code',
+      impact: 'Reach',
+      contribution: 'Output',
       community: 'Community',
-      breadth: 'Breadth',
-      documentation: 'Docs',
+      breadth: 'Stack Range',
+      documentation: 'Documentation',
     },
     stats: 'Statistics',
     followers: 'Followers',
@@ -133,19 +133,8 @@ const labels = {
   },
 } as const
 
-function CompareModeTabs({ language }: CompareProps) {
-  const text = labels[language]
-
-  return (
-    <div className="compare-mode-tabs" role="tablist" aria-label={text.title}>
-      <Link to="/compare/users" className="compare-mode-tab compare-mode-tab-active">
-        {text.tabsUsers}
-      </Link>
-      <Link to="/compare/repos" className="compare-mode-tab">
-        {text.tabsRepos}
-      </Link>
-    </div>
-  )
+function CompareModeTabs(_: CompareProps) {
+  return null
 }
 
 export function Compare({ language }: CompareProps) {

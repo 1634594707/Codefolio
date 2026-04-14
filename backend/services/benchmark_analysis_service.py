@@ -3,6 +3,7 @@ Benchmark analysis orchestration service.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Callable
@@ -24,6 +25,7 @@ from benchmark_models import (
     SuccessHypothesis,
 )
 from cache_keys import benchmark_cache_key
+from database import ARTIFACT_BENCHMARK_REPORT, snapshot_store
 from services.action_generator import generate_action_items
 from services.bucket_service import determine_bucket
 from services.dimension_analyzer import (
@@ -39,13 +41,22 @@ from services.dimension_analyzer import (
 from services.repository_profile_service import RepositoryProfileService
 from utils.redis_client import redis_client
 
+logger = logging.getLogger(__name__)
+
 
 DimensionFn = Callable[[RepositoryProfile], DimensionScore]
 
+_DEFAULT_MAX_README_CHARS = 12000
+
 
 class BenchmarkAnalysisService:
-    def __init__(self, profile_service: RepositoryProfileService | None = None):
+    def __init__(
+        self,
+        profile_service: RepositoryProfileService | None = None,
+        ai_service=None,
+    ):
         self.profile_service = profile_service or RepositoryProfileService()
+        self.ai_service = ai_service  # Optional AIService; None disables LLM narrative
         self._analyzers: list[tuple[AnalysisDimension, DimensionFn]] = [
             (AnalysisDimension.POSITIONING, analyze_positioning),
             (AnalysisDimension.FIRST_IMPRESSION, analyze_first_impression),
@@ -100,12 +111,22 @@ class BenchmarkAnalysisService:
         language: str = "en",
         include_narrative: bool = False,
         force_refresh: bool = False,
+        max_readme_chars: int = _DEFAULT_MAX_README_CHARS,
     ) -> BenchmarkReport:
         cache_key = benchmark_cache_key(mine, benchmarks, language, include_narrative)
         if not force_refresh:
             cached = await redis_client.get(cache_key)
             if cached:
                 return self._deserialize_report(cached)
+            db_snapshot = await snapshot_store.get_snapshot(
+                ARTIFACT_BENCHMARK_REPORT,
+                cache_key,
+                language=language,
+                max_age_seconds=3600,
+            )
+            if db_snapshot:
+                await redis_client.set(cache_key, db_snapshot, 3600)
+                return self._deserialize_report(db_snapshot)
 
         mine_profile = await self.profile_service.get_profile(mine, force_refresh=force_refresh)
 
@@ -125,21 +146,38 @@ class BenchmarkAnalysisService:
         all_profiles = [mine_profile, *benchmark_profiles]
         score_table = {profile.full_name: self._analyze_profile(profile) for profile in all_profiles}
 
+        feature_matrix = self._build_feature_matrix(all_profiles, score_table, language)
+
+        narrative, llm_calls = await self._generate_narrative(
+            all_profiles=all_profiles,
+            feature_matrix=feature_matrix,
+            include_narrative=include_narrative,
+            language=language,
+            max_readme_chars=max_readme_chars,
+        )
+
         report = BenchmarkReport(
             bucket=self._build_bucket(all_profiles, skipped, language),
             profiles={profile.full_name: profile for profile in all_profiles},
-            feature_matrix=self._build_feature_matrix(all_profiles, score_table, language),
+            feature_matrix=feature_matrix,
             hypotheses=self._build_hypotheses(mine_profile, benchmark_profiles, score_table, language),
             actions=generate_action_items(
                 mine_scores=score_table[mine_profile.full_name],
                 benchmark_scores=self._invert_scores(benchmark_profiles, score_table),
                 language=language,
             ),
-            narrative=self._build_narrative(language, include_narrative),
+            narrative=narrative,
             generated_at=datetime.now(timezone.utc),
-            llm_calls=0,
+            llm_calls=llm_calls,
         )
-        await redis_client.set(cache_key, self._serialize_report(report), 3600)
+        serialized = self._serialize_report(report)
+        await redis_client.set(cache_key, serialized, 3600)
+        await snapshot_store.upsert_snapshot(
+            ARTIFACT_BENCHMARK_REPORT,
+            cache_key,
+            serialized,
+            language=language,
+        )
         return report
 
     def _analyze_profile(self, profile: RepositoryProfile) -> dict[str, DimensionScore]:
@@ -413,6 +451,88 @@ class BenchmarkAnalysisService:
         if include_narrative:
             summary = f"{summary} {copy['narrative_fallback']}"
         return Narrative(summary=summary, disclaimer=copy["disclaimer"])
+
+    async def _generate_narrative(
+        self,
+        all_profiles: list[RepositoryProfile],
+        feature_matrix: FeatureMatrix,
+        include_narrative: bool,
+        language: str,
+        max_readme_chars: int,
+    ) -> tuple[Narrative | None, int]:
+        """Generate LLM narrative (one call) or return None when disabled.
+
+        Returns (narrative, llm_calls) where llm_calls is 0 when narrative is
+        disabled and 1 on a successful LLM call.  On LLM failure the report is
+        returned without a narrative field (None) and llm_calls stays 0.
+        """
+        disclaimer = (
+            "Correlation does not imply causation. "
+            "This analysis is based on public repository signals only."
+        )
+        if language == "zh":
+            disclaimer = (
+                "相关性不代表因果关系。"
+                "本分析仅基于公开仓库信号。"
+            )
+
+        if not include_narrative:
+            return None, 0
+
+        if self.ai_service is None:
+            logger.warning("Narrative requested but AIService is not configured; skipping LLM call.")
+            copy = self._copy.get(language, self._copy["en"])
+            return Narrative(summary=copy["summary"], disclaimer=disclaimer), 0
+
+        # Build the prompt -------------------------------------------------------
+        # Feature matrix summary (dimension → levels per repo)
+        matrix_lines = []
+        for row in feature_matrix.rows:
+            cells_str = ", ".join(f"{c.repo}: {c.level}" for c in row.cells)
+            matrix_lines.append(f"- {row.label}: {cells_str}")
+        matrix_text = "\n".join(matrix_lines)
+
+        # Truncated README content per repository (Req 6.2)
+        readme_sections: list[str] = []
+        for profile in all_profiles:
+            readme_raw = getattr(profile, "readme_text", None) or ""
+            truncated = readme_raw[:max_readme_chars]
+            if truncated:
+                readme_sections.append(f"### {profile.full_name} README (truncated)\n{truncated}")
+
+        readme_text = "\n\n".join(readme_sections) if readme_sections else "(no README content available)"
+
+        if language == "zh":
+            system_prompt = (
+                "你是一位资深开源开发者，正在对比多个 GitHub 仓库。"
+                "请根据下方的特征矩阵和 README 摘要，用中文写一段简洁的对比总结（3-5 句话）。"
+                "只描述可观测的差异，不要推断因果关系。"
+            )
+            user_prompt = (
+                f"特征矩阵：\n{matrix_text}\n\n"
+                f"README 摘要：\n{readme_text}\n\n"
+                "请写一段简洁的对比总结。"
+            )
+        else:
+            system_prompt = (
+                "You are a senior open-source developer comparing GitHub repositories. "
+                "Write a concise 3-5 sentence narrative summary based on the feature matrix "
+                "and README excerpts below. Describe only observable differences; "
+                "do not infer causation."
+            )
+            user_prompt = (
+                f"Feature Matrix:\n{matrix_text}\n\n"
+                f"README excerpts:\n{readme_text}\n\n"
+                "Write a concise comparison narrative."
+            )
+
+        try:
+            summary = await self.ai_service._call_llm(user_prompt, system_prompt)
+            logger.info("LLM narrative generated successfully (llm_calls=1)")
+            return Narrative(summary=summary.strip(), disclaimer=disclaimer), 1
+        except Exception as exc:
+            logger.warning("LLM narrative generation failed; returning report without narrative: %s", exc)
+            return None, 0
 
     def _serialize_report(self, report: BenchmarkReport) -> dict:
         return jsonable_encoder(asdict(report))

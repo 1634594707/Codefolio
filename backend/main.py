@@ -11,6 +11,14 @@ from pydantic import BaseModel, Field
 
 from cache_keys import ai_cache_keys_to_clear, github_user_cache_keys_to_clear, repository_analysis_cache_prefix
 from config import settings
+from database import (
+    ARTIFACT_AI_ROAST,
+    ARTIFACT_AI_STYLE_TAGS,
+    ARTIFACT_AI_TECH_SUMMARY,
+    ARTIFACT_GITHUB_USER,
+    ARTIFACT_REPOSITORY_ANALYSIS,
+    snapshot_store,
+)
 from routers import repos_benchmark
 from services.ai_service import AIService
 from services.github_service import GitHubService
@@ -37,9 +45,11 @@ class RepositoryAnalysisRequestModel(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await snapshot_store.connect()
     await redis_client.connect()
     yield
     await redis_client.close()
+    await snapshot_store.close()
 
 
 app = FastAPI(
@@ -201,6 +211,8 @@ async def health_check():
         "service": "codefolio-api",
         "ai_configured": bool(settings.AI_API_KEY and settings.AI_API_KEY.strip()),
         "redis_connected": redis_client.client is not None,
+        "database_ready": snapshot_store.ready,
+        "database_path": settings.DATABASE_PATH,
     }
 
 
@@ -300,12 +312,25 @@ async def clear_user_cache(username: str):
         deleted_repo_analysis = await redis_client.delete_pattern(
             f"{repository_analysis_cache_prefix(sanitized_username)}*"
         )
+        deleted_db_rows = 0
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_GITHUB_USER, sanitized_username)
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_STYLE_TAGS, sanitized_username, "en")
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_STYLE_TAGS, sanitized_username, "zh")
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_ROAST, sanitized_username, "en")
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_ROAST, sanitized_username, "zh")
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_TECH_SUMMARY, sanitized_username, "en")
+        deleted_db_rows += await snapshot_store.delete_snapshot(ARTIFACT_AI_TECH_SUMMARY, sanitized_username, "zh")
+        deleted_db_rows += await snapshot_store.delete_scope_prefix(
+            ARTIFACT_REPOSITORY_ANALYSIS,
+            f"{sanitized_username}/",
+        )
 
         return {
             "status": "success",
-            "message": f"Cache cleared for user: {sanitized_username}",
+            "message": f"Cache and snapshots cleared for user: {sanitized_username}",
             "cleared_keys": keys_to_clear,
             "cleared_repo_analysis_count": deleted_repo_analysis,
+            "cleared_snapshot_rows": deleted_db_rows,
         }
     except Exception as error:
         raise HTTPException(

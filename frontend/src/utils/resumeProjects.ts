@@ -20,6 +20,7 @@ export type RepositoryAnalysisPayload = {
     summary: string
     highlights: string[]
     keywords: string[]
+    evidence?: string[]
   }
 }
 

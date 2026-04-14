@@ -1,0 +1,4 @@
+# file: D:\Administrator\Desktop\Project\Codefolio\backend\benchmark_models.py
+# hypothesis_version: 6.151.14
+
+['30d', '7d', '90d', 'L', 'M', 'S', 'community', 'compliance', 'discovery', 'engineering_quality', 'file', 'first_impression', 'high', 'llm_summarized', 'low', 'medium', 'metric', 'missing', 'onboarding', 'positioning', 'readme_section', 'releases', 'rule_based', 'strong', 'topic', 'weak']

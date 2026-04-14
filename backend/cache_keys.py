@@ -50,6 +50,11 @@ def repository_profile_cache_key(full_name: str) -> str:
     return f"github:repo:{REPOSITORY_PROFILE_CACHE_VERSION}:{normalized}"
 
 
+def repo_profile_cache_key(owner: str, repo: str) -> str:
+    """Cache key for repository profiles. Format: repo:profile:v1:{owner_lower}/{repo_lower}"""
+    return f"repo:profile:{REPOSITORY_PROFILE_CACHE_VERSION}:{owner.strip().lower()}/{repo.strip().lower()}"
+
+
 def benchmark_cache_key(
     mine: str,
     benchmarks: list[str],
@@ -62,6 +67,14 @@ def benchmark_cache_key(
     bench_hash = hashlib.md5(",".join(sorted(item.strip().lower() for item in benchmarks)).encode()).hexdigest()[:8]
     narrative_flag = "n1" if include_narrative else "n0"
     return f"benchmark:v2:{mine_hash}:{bench_hash}:{language}:{narrative_flag}"
+
+
+def benchmark_result_cache_key(mine: str, benchmarks: list[str]) -> str:
+    """Cache key for benchmark results. Format: benchmark:v1:{mine_hash}:{benchmarks_hash}"""
+    import hashlib
+    mine_hash = hashlib.md5(mine.strip().lower().encode()).hexdigest()[:8]
+    benchmarks_hash = hashlib.md5(",".join(sorted(item.strip().lower() for item in benchmarks)).encode()).hexdigest()[:8]
+    return f"benchmark:v1:{mine_hash}:{benchmarks_hash}"
 
 
 def suggestion_cache_key(repo: str, limit: int) -> str:

@@ -320,7 +320,7 @@ def analyze_compliance(profile: RepositoryProfile) -> DimensionScore:
     """
     features = {
         "has_license_file": profile.has_license_file,
-        "license_type": profile.license,
+        "license_type": profile.license if profile.license is not None else "not detected",
         "is_permissive": _is_permissive_license(profile.license),
         "license_clarity": profile.license is not None
     }
