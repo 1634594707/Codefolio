@@ -17,6 +17,8 @@ dist-ssr/
 # Environment
 .env
 .env.local
+.env.production
+backend/.env
 
 # IDE
 .vscode/

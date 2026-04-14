@@ -1,57 +1,36 @@
 # Codefolio
 
 <p align="center">
-  <a href="README.zh-CN.md">中文版</a> ·
-  <a href="https://github.com/1634594707/Codefolio/releases">Releases</a> ·
+  <a href="README.zh-CN.md">中文文档</a> |
+  <a href="https://github.com/1634594707/Codefolio/releases">Releases</a> |
   <a href="LICENSE">License</a>
 </p>
 
-Transform your GitHub footprint into professional resumes, shareable social cards, and actionable repository benchmarks.
-
----
+Codefolio turns a GitHub profile into resumes, social cards, AI summaries, and repository benchmark reports.
 
 ## Features
 
 | Feature | Description |
 |---|---|
-| **GitScore** | Multi-dimensional developer scoring (0–100) |
-| **AI Insights** | Style tags and tech summaries powered by LLM |
-| **Resume Generation** | Professional Markdown / PDF resumes |
-| **Social Cards** | Shareable PNG cards for social media |
-| **Developer Compare** | Side-by-side comparison of up to 3 GitHub profiles |
-| **Repository Benchmark** | Compare your repo against peers — gap matrix, action items, hypothesis cards |
-| **Benchmark Recommendations** | Auto-suggest similar repos via GitHub Search API |
-| **Export** | One-click Markdown export of benchmark reports (EN / ZH) |
-| **Caching** | Redis-based caching with differential TTL per data type |
-| **i18n** | English and Chinese UI + content |
-| **Theme** | Light and dark mode |
+| GitScore | Multi-dimensional developer scoring |
+| AI Insights | Style tags, roast comments, and technical summaries |
+| Resume Export | Markdown and PDF export |
+| Social Cards | Shareable image cards |
+| Developer Compare | Side-by-side comparison for up to 3 GitHub users |
+| Repository Benchmark | Compare one repo against peers with gap analysis |
+| Benchmark Suggestions | Auto-discover comparable repositories |
+| Workspace Isolation | Browser workspace scoped AI and benchmark artifacts |
+| Docker Deployment | Full stack container setup for local and production use |
 
----
+## Stack
 
-## What's New in v1.1.0
+- Frontend: React 18, Vite, Tailwind CSS
+- Backend: FastAPI, Python 3.11
+- Cache: Redis
+- Storage: SQLite snapshot store
+- Upstream APIs: GitHub REST/GraphQL, OpenAI-compatible LLM APIs
 
-- **Repository Benchmark** is now fully shipped — gap matrix, 8-dimension analysis, action items, success hypothesis cards, and optional LLM narrative
-- **Suggest Benchmarks** button auto-finds similar repos by language, topics, and size category
-- **Markdown export** of full benchmark reports (EN/ZH)
-- **Staleness warning** when cached data is older than 7 days
-- **Rate limiting** per IP to protect benchmark endpoints
-- **Token redaction** — GitHub tokens are never exposed in logs or error responses
-- **Full test suite** — 36 property-based tests (Hypothesis) + frontend unit/property tests (Vitest + fast-check)
-
-See [CHANGELOG.md](CHANGELOG.md) for the full list.
-
----
-
-## Architecture
-
-- **Frontend**: React 18 + Vite + Tailwind CSS
-- **Backend**: Python 3.11+ + FastAPI
-- **Cache**: Redis 7+
-- **APIs**: GitHub REST/GraphQL API, DeepSeek / GPT-4o-mini
-
----
-
-## Quick Start
+## Local Development
 
 ### Prerequisites
 
@@ -64,14 +43,17 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list.
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # fill in your API keys
-redis-server &
-python main.py
+cp .env.example .env
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Backend runs at `http://localhost:8000`
+Windows activate command:
+
+```powershell
+venv\Scripts\activate
+```
 
 ### Frontend
 
@@ -81,13 +63,14 @@ npm install
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173`
+Default URLs:
 
----
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
 
 ## Docker
 
-Run the full stack with Docker Compose:
+### Development compose
 
 ```bash
 docker compose up --build
@@ -95,129 +78,120 @@ docker compose up --build
 
 Services:
 
-- `frontend`: `http://localhost:8080`
-- `backend`: internal FastAPI service on `backend:8000`
-- `redis`: internal Redis service on `redis:6379`
+- Frontend: `http://localhost:8080`
+- Backend: internal `backend:8000`
+- Redis: internal `redis:6379`
 
-Notes:
+### Production compose
 
-- Frontend is served by Nginx and proxies `/api/*` to the backend container.
-- Backend SQLite data is persisted in the `backend-data` volume.
-- Redis data is persisted in the `redis-data` volume.
+1. Prepare backend secrets:
 
----
+```bash
+cp backend/.env.example backend/.env
+```
+
+2. Prepare production variables:
+
+```bash
+cp .env.production.example .env.production
+```
+
+3. Update:
+
+- `backend/.env` with `GITHUB_TOKEN`, `AI_API_KEY`, and model settings
+- `.env.production` with your real domain and public port
+
+4. Start production services:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+Production notes:
+
+- Frontend is served by Nginx.
+- `/api/*` is proxied from Nginx to the backend container.
+- Backend data persists in the `backend-data` volume.
+- Redis data persists in the `redis-data` volume.
+- Compose health checks wait for Redis and the backend before exposing the frontend.
+
+## Deployment Checklist
+
+- Set a valid `GITHUB_TOKEN`
+- Set a valid `AI_API_KEY` or accept local fallback summaries
+- Restrict `CORS_ORIGINS` to your real domain
+- Keep `backend/.env` out of Git
+- Back up the `backend-data` Docker volume
+- Put HTTPS in front of the public endpoint if you deploy to the internet
 
 ## Workspace Isolation
 
-Codefolio now uses a browser-scoped workspace id to isolate user-facing AI and benchmark artifacts.
+Codefolio now assigns a browser-scoped workspace id and sends it in `X-Codefolio-Workspace`.
 
-- Public GitHub source data can still be shared through global caching.
-- AI summaries, repository analysis outputs, and benchmark reports are stored per workspace scope.
-- Active workspaces are registered in the backend database for future user/workspace upgrades.
-
----
+- Public GitHub source data can still use shared cache paths
+- AI summaries, repository analysis, and benchmark snapshots are stored per workspace
+- The backend records active workspaces for future user-account and team upgrades
 
 ## Environment Variables
 
-```env
-# GitHub API
-GITHUB_TOKEN=your_github_token
+Key backend variables:
 
-# AI API
+```env
+GITHUB_TOKEN=your_github_token
 AI_API_KEY=your_ai_api_key
 AI_API_BASE_URL=https://api.deepseek.com/v1
 AI_MODEL=deepseek-chat
-
-# Redis
+AI_REQUEST_TIMEOUT=60.0
 REDIS_URL=redis://localhost:6379
 REDIS_DB=0
-
-# CORS
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-
-# Cache TTL (seconds)
+DATABASE_PATH=/app/data/codefolio.db
+CORS_ORIGINS=http://localhost:8080,https://your-domain.com
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800
-
-# Rate limiting (benchmark endpoints)
-RATE_LIMIT_MAX_REQUESTS=10
-RATE_LIMIT_WINDOW_SECONDS=60
+REPOSITORY_METADATA_TTL=3600
+REPOSITORY_README_TTL=21600
+REPOSITORY_STAR_HISTORY_TTL=86400
+BENCHMARK_RATE_LIMIT_MAX_REQUESTS=10
+BENCHMARK_RATE_LIMIT_WINDOW_SECONDS=60
+LLM_NARRATIVE_ENABLED=true
+LLM_MAX_README_CHARS_PER_REPO=12000
 ```
 
----
+See [backend/.env.example](/D:/Administrator/Desktop/Project/Codefolio/backend/.env.example) for the full template.
 
-## API Endpoints
+## API
 
-### Core
+### Core endpoints
+
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/generate` | Generate developer profile |
-| `POST` | `/api/workspaces/ensure` | Register / refresh an active workspace scope |
+| `GET` | `/api/health` | Service health status |
+| `POST` | `/api/generate` | Generate developer profile data |
+| `POST` | `/api/workspaces/ensure` | Register or refresh a workspace scope |
 
-### Repository Benchmark
+### Repository benchmark endpoints
+
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/repos/profile` | Fetch / cache a repository profile |
-| `POST` | `/api/repos/benchmark` | Run multi-repo comparison (1–3 benchmarks) |
-| `GET` | `/api/repos/suggest-benchmarks` | Auto-suggest similar benchmark repos |
+| `POST` | `/api/repos/profile` | Fetch or cache repository profile |
+| `POST` | `/api/repos/benchmark` | Compare one repository against peers |
+| `GET` | `/api/repos/suggest-benchmarks` | Recommend similar repositories |
 | `DELETE` | `/api/repos/cache/{owner}/{repo}` | Invalidate repository cache |
 
----
+## Verification
 
-## Project Structure
+Validated in this repository:
 
-```
-codefolio/
-├── backend/
-│   ├── main.py
-│   ├── config.py
-│   ├── benchmark_models.py          # Pydantic / dataclass models
-│   ├── cache_keys.py                # Centralised Redis key definitions
-│   ├── i18n/                        # EN / ZH translation files
-│   ├── routers/
-│   │   └── repos_benchmark.py       # Benchmark API router
-│   ├── services/
-│   │   ├── benchmark_analysis_service.py
-│   │   ├── benchmark_recommendation_service.py
-│   │   ├── bucket_service.py
-│   │   ├── dimension_analyzer.py
-│   │   ├── action_generator.py
-│   │   ├── repository_profile_service.py
-│   │   ├── github_service.py
-│   │   └── ai_service.py
-│   └── utils/
-│       ├── rate_limiter.py
-│       ├── token_redaction.py
-│       └── redis_client.py
-├── frontend/
-│   └── src/
-│       ├── components/
-│       │   ├── BenchmarkMatrix.tsx
-│       │   ├── ActionList.tsx
-│       │   └── HypothesisCards.tsx
-│       ├── pages/
-│       │   ├── CompareRepos.tsx
-│       │   └── Export.tsx
-│       ├── utils/
-│       │   ├── benchmarkExport.ts
-│       │   └── formatCacheAge.ts
-│       └── types/
-│           └── benchmark.ts
-├── CHANGELOG.md
-├── LICENSE
-├── README.md
-└── README.zh-CN.md
-```
+- Frontend production build passes
+- Frontend benchmark-related tests pass
+- Backend Python syntax checks pass
+- `docker compose config` passes
 
----
+Current environment limitations:
+
+- Full backend pytest requires `hypothesis` installed locally
+- `docker compose build` can still fail if the host cannot reach Docker Hub
 
 ## License
 
-Licensed under the **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)**.
-
-- ✅ Personal use, education, research, qualifying nonprofits
-- ❌ Commercial use without separate written permission
-
-See [`LICENSE`](LICENSE) for full terms.  
-SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
