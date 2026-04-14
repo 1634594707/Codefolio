@@ -1,37 +1,57 @@
 # Codefolio
 
-Transform your GitHub footprint into professional resumes and shareable social cards—and understand how you stack up against other developers and (planned) benchmark repositories.
+<p align="center">
+  <a href="README.zh-CN.md">中文版</a> ·
+  <a href="https://github.com/1634594707/Codefolio/releases">Releases</a> ·
+  <a href="LICENSE">License</a>
+</p>
 
-## Vision
+Transform your GitHub footprint into professional resumes, shareable social cards, and actionable repository benchmarks.
 
-Codefolio helps developers turn public GitHub activity into **resume-ready narratives** and **shareable assets**. The product direction includes deeper **comparison**: not only multi-user GitScore and radar charts, but eventually **repository-level benchmarking**—using observable signals (README quality, topics, releases, activity) plus structured AI output to surface **gaps, actionable tasks, and strategy options**, without promising viral growth. Detailed design notes (scope, data model, phased delivery) are kept **locally only** and are not part of this repository.
+---
 
 ## Features
 
-- **GitScore**: Multi-dimensional developer scoring (0-100)
-- **AI Insights**: Style tags and tech summaries powered by LLM
-- **Resume Generation**: Professional Markdown/PDF resumes
-- **Social Cards**: Shareable PNG cards for social media
-- **Compare**: Side-by-side comparison of up to three GitHub profiles (GitScore, dimensions, languages, summaries)
-- **Repositories & export flow**: Curate standout repos and export Markdown / social card previews
-- **Caching**: Redis-based caching for performance
-- **i18n**: English and Chinese language support
-- **Theme**: Light and dark mode support
+| Feature | Description |
+|---|---|
+| **GitScore** | Multi-dimensional developer scoring (0–100) |
+| **AI Insights** | Style tags and tech summaries powered by LLM |
+| **Resume Generation** | Professional Markdown / PDF resumes |
+| **Social Cards** | Shareable PNG cards for social media |
+| **Developer Compare** | Side-by-side comparison of up to 3 GitHub profiles |
+| **Repository Benchmark** | Compare your repo against peers — gap matrix, action items, hypothesis cards |
+| **Benchmark Recommendations** | Auto-suggest similar repos via GitHub Search API |
+| **Export** | One-click Markdown export of benchmark reports (EN / ZH) |
+| **Caching** | Redis-based caching with differential TTL per data type |
+| **i18n** | English and Chinese UI + content |
+| **Theme** | Light and dark mode |
 
-### Roadmap (design)
+---
 
-- **Repository benchmark mode** (planned): Compare your repo to peers (same language/topics and similar scale), hypothesis cards with evidence, gap matrix, and prioritized action lists; storage options TBD in local design notes.
+## What's New in v1.1.0
+
+- **Repository Benchmark** is now fully shipped — gap matrix, 8-dimension analysis, action items, success hypothesis cards, and optional LLM narrative
+- **Suggest Benchmarks** button auto-finds similar repos by language, topics, and size category
+- **Markdown export** of full benchmark reports (EN/ZH)
+- **Staleness warning** when cached data is older than 7 days
+- **Rate limiting** per IP to protect benchmark endpoints
+- **Token redaction** — GitHub tokens are never exposed in logs or error responses
+- **Full test suite** — 36 property-based tests (Hypothesis) + frontend unit/property tests (Vitest + fast-check)
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+---
 
 ## Architecture
 
 - **Frontend**: React 18 + Vite + Tailwind CSS
 - **Backend**: Python 3.11+ + FastAPI
 - **Cache**: Redis 7+
-- **APIs**: GitHub GraphQL API v4, DeepSeek/GPT-4o-mini
+- **APIs**: GitHub REST/GraphQL API, DeepSeek / GPT-4o-mini
 
-Future benchmark features may add **PostgreSQL** (or SQLite for small deployments) for repository snapshots and reports.
+---
 
-## Setup
+## Quick Start
 
 ### Prerequisites
 
@@ -39,71 +59,40 @@ Future benchmark features may add **PostgreSQL** (or SQLite for small deployment
 - Node.js 18+
 - Redis 7+
 
-### Backend Setup
+### Backend
 
-1. Navigate to backend directory:
 ```bash
 cd backend
-```
-
-2. Create virtual environment:
-```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-4. Configure environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-5. Start Redis (if not running):
-```bash
-redis-server
-```
-
-6. Run the backend:
-```bash
+cp .env.example .env          # fill in your API keys
+redis-server &
 python main.py
 ```
 
-Backend will be available at `http://localhost:8000`
+Backend runs at `http://localhost:8000`
 
-### Frontend Setup
+### Frontend
 
-1. Navigate to frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Start development server:
-```bash
 npm run dev
 ```
 
-Frontend will be available at `http://localhost:5173`
+Frontend runs at `http://localhost:5173`
+
+---
 
 ## Environment Variables
 
-### Backend (.env)
-
 ```env
 # GitHub API
-GITHUB_TOKEN=your_github_token_here
+GITHUB_TOKEN=your_github_token
 
 # AI API
-AI_API_KEY=your_ai_api_key_here
+AI_API_KEY=your_ai_api_key
 AI_API_BASE_URL=https://api.deepseek.com/v1
 AI_MODEL=deepseek-chat
 
@@ -117,74 +106,85 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 # Cache TTL (seconds)
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800
+
+# Rate limiting (benchmark endpoints)
+RATE_LIMIT_MAX_REQUESTS=10
+RATE_LIMIT_WINDOW_SECONDS=60
 ```
+
+---
 
 ## API Endpoints
 
-- `GET /api/health` - Health check
-- `POST /api/generate` - Generate profile (username, language)
-- `GET /api/export/pdf` - Export resume as PDF
+### Core
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Health check |
+| `POST` | `/api/generate` | Generate developer profile |
+
+### Repository Benchmark
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/repos/profile` | Fetch / cache a repository profile |
+| `POST` | `/api/repos/benchmark` | Run multi-repo comparison (1–3 benchmarks) |
+| `GET` | `/api/repos/suggest-benchmarks` | Auto-suggest similar benchmark repos |
+| `DELETE` | `/api/repos/cache/{owner}/{repo}` | Invalidate repository cache |
+
+---
 
 ## Project Structure
 
 ```
 codefolio/
 ├── backend/
-│   ├── main.py              # FastAPI application
-│   ├── config.py            # Configuration settings
-│   ├── requirements.txt     # Python dependencies
-│   ├── services/            # Business logic services
-│   │   └── __init__.py
-│   └── utils/               # Utility modules
-│       ├── __init__.py
-│       └── redis_client.py  # Redis connection manager
+│   ├── main.py
+│   ├── config.py
+│   ├── benchmark_models.py          # Pydantic / dataclass models
+│   ├── cache_keys.py                # Centralised Redis key definitions
+│   ├── i18n/                        # EN / ZH translation files
+│   ├── routers/
+│   │   └── repos_benchmark.py       # Benchmark API router
+│   ├── services/
+│   │   ├── benchmark_analysis_service.py
+│   │   ├── benchmark_recommendation_service.py
+│   │   ├── bucket_service.py
+│   │   ├── dimension_analyzer.py
+│   │   ├── action_generator.py
+│   │   ├── repository_profile_service.py
+│   │   ├── github_service.py
+│   │   └── ai_service.py
+│   └── utils/
+│       ├── rate_limiter.py
+│       ├── token_redaction.py
+│       └── redis_client.py
 ├── frontend/
-│   ├── src/
-│   │   ├── App.tsx          # Main React component
-│   │   ├── main.tsx         # Entry point
-│   │   └── index.css        # Global styles with theme
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── tsconfig.json
-├── LICENSE                  # PolyForm Noncommercial 1.0.0 (no commercial use)
+│   └── src/
+│       ├── components/
+│       │   ├── BenchmarkMatrix.tsx
+│       │   ├── ActionList.tsx
+│       │   └── HypothesisCards.tsx
+│       ├── pages/
+│       │   ├── CompareRepos.tsx
+│       │   └── Export.tsx
+│       ├── utils/
+│       │   ├── benchmarkExport.ts
+│       │   └── formatCacheAge.ts
+│       └── types/
+│           └── benchmark.ts
+├── CHANGELOG.md
+├── LICENSE
 ├── README.md
 └── README.zh-CN.md
 ```
 
-## Development
-
-### Backend Development
-
-```bash
-cd backend
-source venv/bin/activate
-python main.py
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-npm run dev
-```
-
-### Building for Production
-
-Frontend:
-```bash
-cd frontend
-npm run build
-```
+---
 
 ## License
 
-This project is licensed under the **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)**.
+Licensed under the **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)**.
 
-- **Non-commercial use** is allowed under the terms in [`LICENSE`](LICENSE) (personal use, education, qualifying nonprofits, etc.).
-- **Commercial use** (e.g. selling the product, offering it as part of a paid service, or internal use primarily for commercial advantage outside the license’s exceptions) **is not permitted** without separate written permission from the copyright holder.
+- ✅ Personal use, education, research, qualifying nonprofits
+- ❌ Commercial use without separate written permission
 
-This is not legal advice. For commercial licensing, contact the project authors.
-
+See [`LICENSE`](LICENSE) for full terms.  
 SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
