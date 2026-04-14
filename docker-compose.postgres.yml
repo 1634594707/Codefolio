@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-codefolio}
+      POSTGRES_USER: ${POSTGRES_USER:-codefolio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-codefolio} -d ${POSTGRES_DB:-codefolio}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-codefolio}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-codefolio}
+      DATABASE_PATH: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

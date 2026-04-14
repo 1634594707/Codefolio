@@ -115,6 +115,26 @@ Production notes:
 - Redis data persists in the `redis-data` volume.
 - Compose health checks wait for Redis and the backend before exposing the frontend.
 
+### PostgreSQL upgrade path
+
+Codefolio now supports a database compatibility layer for SQLite and PostgreSQL.
+
+- Default mode keeps using `DATABASE_PATH` with SQLite
+- PostgreSQL mode is enabled by setting `DATABASE_URL=postgresql://...`
+- Business code still uses the same snapshot store API
+
+Compose example with PostgreSQL:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.postgres.yml up -d --build
+```
+
+Files related to this path:
+
+- [docker-compose.postgres.yml](/D:/Administrator/Desktop/Project/Codefolio/docker-compose.postgres.yml)
+- [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
+- [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
+
 ## Deployment Checklist
 
 - Set a valid `GITHUB_TOKEN`
@@ -145,6 +165,7 @@ AI_REQUEST_TIMEOUT=60.0
 REDIS_URL=redis://localhost:6379
 REDIS_DB=0
 DATABASE_PATH=/app/data/codefolio.db
+DATABASE_URL=postgresql://codefolio:change-me@postgres:5432/codefolio
 CORS_ORIGINS=http://localhost:8080,https://your-domain.com
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800

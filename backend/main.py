@@ -228,7 +228,8 @@ async def health_check():
         "ai_configured": bool(settings.AI_API_KEY and settings.AI_API_KEY.strip()),
         "redis_connected": redis_client.client is not None,
         "database_ready": snapshot_store.ready,
-        "database_path": settings.DATABASE_PATH,
+        "database_backend": settings.database_backend,
+        "database_target": settings.database_target,
     }
 
 

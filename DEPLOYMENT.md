@@ -7,6 +7,7 @@ This document focuses on production deployment for Codefolio.
 - `backend/.env`
 - `.env.production`
 - `docker-compose.prod.yml`
+- `docker-compose.postgres.yml` for PostgreSQL deployments
 
 Templates:
 
@@ -32,6 +33,13 @@ Recommended:
 - Use a production-grade AI key, not a development key
 - Keep this file out of Git
 
+PostgreSQL example:
+
+```env
+DATABASE_URL=postgresql://codefolio:change-me@postgres:5432/codefolio
+DATABASE_PATH=
+```
+
 ## 3. Public Runtime Variables
 
 Create `.env.production` from the template:
@@ -47,6 +55,12 @@ If you have multiple domains, separate them with commas.
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+To run with PostgreSQL instead of SQLite:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.postgres.yml up -d --build
 ```
 
 ## 5. Health Checks
@@ -70,8 +84,9 @@ Docker volumes:
 
 - `backend-data`: SQLite database and snapshot state
 - `redis-data`: Redis persisted data
+- `postgres-data`: PostgreSQL data when you enable the PostgreSQL override
 
-Back up `backend-data` regularly if you rely on the local SQLite store in production.
+Back up `backend-data` or `postgres-data` regularly depending on the backend you choose.
 
 ## 7. Reverse Proxy and HTTPS
 
@@ -89,6 +104,11 @@ Minimum requirements:
 - Enable HTTPS
 - Forward traffic to the frontend container
 - Preserve standard forwarded headers
+
+Ready-to-adapt samples:
+
+- [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
+- [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
 
 ## 8. Recommended Next Step
 

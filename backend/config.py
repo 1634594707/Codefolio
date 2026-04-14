@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
 
     # Durable snapshot storage
+    DATABASE_URL: str = ""
     DATABASE_PATH: str = str(_BACKEND_ROOT / "data" / "codefolio.db")
 
     # Snapshot freshness / differential TTL strategy (Req 13.3)
@@ -62,6 +63,18 @@ class Settings(BaseSettings):
             parsed = json.loads(stripped)
             return [origin.strip() for origin in parsed if str(origin).strip()]
         return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+
+    @property
+    def database_backend(self) -> str:
+        raw_url = self.DATABASE_URL.strip()
+        if raw_url.startswith("postgresql://") or raw_url.startswith("postgres://"):
+            return "postgresql"
+        return "sqlite"
+
+    @property
+    def database_target(self) -> str:
+        raw_url = self.DATABASE_URL.strip()
+        return raw_url or self.DATABASE_PATH
 
 
 settings = Settings()

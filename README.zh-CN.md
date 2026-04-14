@@ -115,6 +115,26 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 - `redis-data` 卷负责持久化 Redis 数据
 - Compose 会等待 Redis 和后端健康后再拉起前端
 
+### PostgreSQL 升级路线
+
+Codefolio 现在已经有 SQLite / PostgreSQL 兼容层。
+
+- 默认仍使用 `DATABASE_PATH` 指向 SQLite
+- 设置 `DATABASE_URL=postgresql://...` 后，后端会自动切到 PostgreSQL
+- 上层业务代码不需要改，仍然使用同一套 snapshot store 接口
+
+如果要直接用 PostgreSQL 启动：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.postgres.yml up -d --build
+```
+
+相关文件：
+
+- [docker-compose.postgres.yml](/D:/Administrator/Desktop/Project/Codefolio/docker-compose.postgres.yml)
+- [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
+- [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
+
 更详细的上线说明见 [DEPLOYMENT.md](/D:/Administrator/Desktop/Project/Codefolio/DEPLOYMENT.md)。
 
 ## 生产部署检查清单
@@ -147,6 +167,7 @@ AI_REQUEST_TIMEOUT=60.0
 REDIS_URL=redis://localhost:6379
 REDIS_DB=0
 DATABASE_PATH=/app/data/codefolio.db
+DATABASE_URL=postgresql://codefolio:change-me@postgres:5432/codefolio
 CORS_ORIGINS=http://localhost:8080,https://your-domain.com
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800
