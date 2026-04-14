@@ -134,10 +134,38 @@ Files related to this path:
 
 - [docker-compose.postgres.yml](/D:/Administrator/Desktop/Project/Codefolio/docker-compose.postgres.yml)
 - [backend/scripts/migrate_sqlite_to_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/migrate_sqlite_to_postgres.py)
+- [backend/scripts/migrate_postgres_to_sqlite.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/migrate_postgres_to_sqlite.py)
 - [backend/scripts/backup_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/backup_postgres.py)
 - [backend/scripts/restore_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/restore_postgres.py)
+- [scripts/deploy-prod.ps1](/D:/Administrator/Desktop/Project/Codefolio/scripts/deploy-prod.ps1)
+- [scripts/deploy-prod.sh](/D:/Administrator/Desktop/Project/Codefolio/scripts/deploy-prod.sh)
+- [scripts/rollback-to-sqlite.ps1](/D:/Administrator/Desktop/Project/Codefolio/scripts/rollback-to-sqlite.ps1)
+- [scripts/rollback-to-sqlite.sh](/D:/Administrator/Desktop/Project/Codefolio/scripts/rollback-to-sqlite.sh)
 - [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
 - [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
+
+### One-command production flow
+
+PowerShell:
+
+```powershell
+./scripts/deploy-prod.ps1 -DatabaseBackend postgres -MigrateSqliteToPostgres -PostgresUrl "postgresql://codefolio:change-me@127.0.0.1:5432/codefolio"
+```
+
+Shell:
+
+```bash
+DATABASE_BACKEND=postgres \
+MIGRATE_SQLITE_TO_POSTGRES=true \
+POSTGRES_URL=postgresql://codefolio:change-me@127.0.0.1:5432/codefolio \
+./scripts/deploy-prod.sh
+```
+
+Rollback to SQLite:
+
+```powershell
+./scripts/rollback-to-sqlite.ps1 -PostgresUrl "postgresql://codefolio:change-me@127.0.0.1:5432/codefolio"
+```
 
 ## Deployment Checklist
 
@@ -147,6 +175,7 @@ Files related to this path:
 - Keep `backend/.env` out of Git
 - Back up the `backend-data` Docker volume
 - Put HTTPS in front of the public endpoint if you deploy to the internet
+- Run through [PRE_RELEASE_CHECKLIST.md](/D:/Administrator/Desktop/Project/Codefolio/PRE_RELEASE_CHECKLIST.md) before switching traffic
 
 ## Workspace Isolation
 

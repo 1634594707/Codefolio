@@ -65,6 +65,18 @@ To run with PostgreSQL instead of SQLite:
 docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.postgres.yml up -d --build
 ```
 
+One-command wrappers:
+
+```powershell
+./scripts/deploy-prod.ps1 -DatabaseBackend sqlite
+./scripts/deploy-prod.ps1 -DatabaseBackend postgres -MigrateSqliteToPostgres -PostgresUrl "postgresql://codefolio:change-me@127.0.0.1:5432/codefolio"
+```
+
+```bash
+DATABASE_BACKEND=sqlite ./scripts/deploy-prod.sh
+DATABASE_BACKEND=postgres MIGRATE_SQLITE_TO_POSTGRES=true POSTGRES_URL=postgresql://codefolio:change-me@127.0.0.1:5432/codefolio ./scripts/deploy-prod.sh
+```
+
 ## 4.1 Migrate Existing SQLite Data to PostgreSQL
 
 1. Keep the existing SQLite file available.
@@ -87,6 +99,24 @@ python backend/scripts/migrate_sqlite_to_postgres.py \
 ```
 
 After the migration succeeds, switch production to the PostgreSQL compose override.
+
+## 4.2 Roll Back to SQLite
+
+If you need to leave PostgreSQL and go back to SQLite:
+
+```powershell
+./scripts/rollback-to-sqlite.ps1 -PostgresUrl "postgresql://codefolio:change-me@127.0.0.1:5432/codefolio"
+```
+
+```bash
+POSTGRES_URL=postgresql://codefolio:change-me@127.0.0.1:5432/codefolio ./scripts/rollback-to-sqlite.sh
+```
+
+Rollback flow:
+
+1. Create a PostgreSQL dump first
+2. Export PostgreSQL data back into a SQLite file
+3. Restart production with the SQLite-only compose stack
 
 ## 5. Health Checks
 
@@ -131,6 +161,10 @@ Recommendation:
 
 - Keep the `pg_dump` / `pg_restore` major version aligned with the target PostgreSQL server major version.
 - A newer client can sometimes emit statements unsupported by an older server during restore.
+
+## 5.2 Pre-Release Gate
+
+Use [PRE_RELEASE_CHECKLIST.md](/D:/Administrator/Desktop/Project/Codefolio/PRE_RELEASE_CHECKLIST.md) as the final go-live checklist before switching traffic.
 
 ## 6. Data Persistence
 

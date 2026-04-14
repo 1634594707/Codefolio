@@ -134,10 +134,38 @@ docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-c
 
 - [docker-compose.postgres.yml](/D:/Administrator/Desktop/Project/Codefolio/docker-compose.postgres.yml)
 - [backend/scripts/migrate_sqlite_to_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/migrate_sqlite_to_postgres.py)
+- [backend/scripts/migrate_postgres_to_sqlite.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/migrate_postgres_to_sqlite.py)
 - [backend/scripts/backup_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/backup_postgres.py)
 - [backend/scripts/restore_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/restore_postgres.py)
+- [scripts/deploy-prod.ps1](/D:/Administrator/Desktop/Project/Codefolio/scripts/deploy-prod.ps1)
+- [scripts/deploy-prod.sh](/D:/Administrator/Desktop/Project/Codefolio/scripts/deploy-prod.sh)
+- [scripts/rollback-to-sqlite.ps1](/D:/Administrator/Desktop/Project/Codefolio/scripts/rollback-to-sqlite.ps1)
+- [scripts/rollback-to-sqlite.sh](/D:/Administrator/Desktop/Project/Codefolio/scripts/rollback-to-sqlite.sh)
 - [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
 - [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
+
+### 一键生产部署
+
+PowerShell：
+
+```powershell
+./scripts/deploy-prod.ps1 -DatabaseBackend postgres -MigrateSqliteToPostgres -PostgresUrl "postgresql://codefolio:change-me@127.0.0.1:5432/codefolio"
+```
+
+Shell：
+
+```bash
+DATABASE_BACKEND=postgres \
+MIGRATE_SQLITE_TO_POSTGRES=true \
+POSTGRES_URL=postgresql://codefolio:change-me@127.0.0.1:5432/codefolio \
+./scripts/deploy-prod.sh
+```
+
+回滚到 SQLite：
+
+```powershell
+./scripts/rollback-to-sqlite.ps1 -PostgresUrl "postgresql://codefolio:change-me@127.0.0.1:5432/codefolio"
+```
 
 更详细的上线说明见 [DEPLOYMENT.md](/D:/Administrator/Desktop/Project/Codefolio/DEPLOYMENT.md)。
 
@@ -149,6 +177,7 @@ docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-c
 - 不要提交 `backend/.env` 和 `.env.production`
 - 定期备份 `backend-data` 卷
 - 对公网部署时务必接入 HTTPS
+- 切流前跑完 [PRE_RELEASE_CHECKLIST.md](/D:/Administrator/Desktop/Project/Codefolio/PRE_RELEASE_CHECKLIST.md)
 
 ## 工作区隔离
 

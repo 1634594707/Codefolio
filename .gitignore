@@ -35,6 +35,7 @@ Thumbs.db
 *.log
 logs/
 backups/
+scripts/*.local.*
 
 # Redis
 dump.rdb
