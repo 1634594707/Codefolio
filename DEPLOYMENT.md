@@ -38,6 +38,8 @@ PostgreSQL example:
 ```env
 DATABASE_URL=postgresql://codefolio:change-me@postgres:5432/codefolio
 DATABASE_PATH=
+POSTGRES_POOL_MIN_SIZE=1
+POSTGRES_POOL_MAX_SIZE=10
 ```
 
 ## 3. Public Runtime Variables
@@ -63,6 +65,29 @@ To run with PostgreSQL instead of SQLite:
 docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-compose.postgres.yml up -d --build
 ```
 
+## 4.1 Migrate Existing SQLite Data to PostgreSQL
+
+1. Keep the existing SQLite file available.
+2. Bring up PostgreSQL once so the target database exists.
+3. Run the migration script:
+
+```bash
+python backend/scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path backend/data/codefolio.db \
+  --postgres-url postgresql://codefolio:change-me@127.0.0.1:5432/codefolio
+```
+
+If you want to replace existing PostgreSQL data during migration:
+
+```bash
+python backend/scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path backend/data/codefolio.db \
+  --postgres-url postgresql://codefolio:change-me@127.0.0.1:5432/codefolio \
+  --drop-existing
+```
+
+After the migration succeeds, switch production to the PostgreSQL compose override.
+
 ## 5. Health Checks
 
 The production compose file includes health checks for:
@@ -77,6 +102,30 @@ Useful commands:
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
 ```
+
+## 5.1 Backup and Restore
+
+Create a PostgreSQL backup:
+
+```bash
+python backend/scripts/backup_postgres.py \
+  --postgres-url postgresql://codefolio:change-me@127.0.0.1:5432/codefolio \
+  --output backups/codefolio.dump
+```
+
+Restore a PostgreSQL backup:
+
+```bash
+python backend/scripts/restore_postgres.py \
+  --postgres-url postgresql://codefolio:change-me@127.0.0.1:5432/codefolio \
+  --input backups/codefolio.dump \
+  --clean
+```
+
+These scripts depend on local PostgreSQL client tools:
+
+- `pg_dump`
+- `pg_restore`
 
 ## 6. Data Persistence
 
@@ -109,6 +158,23 @@ Ready-to-adapt samples:
 
 - [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
 - [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
+
+### Caddy rollout steps
+
+1. Point your domain DNS record to the server IP.
+2. Start Codefolio on `127.0.0.1:8080` or keep Docker publishing only locally.
+3. Copy `deploy/Caddyfile.example` into your real Caddy config.
+4. Replace `your-domain.com` with the real domain.
+5. Reload Caddy and let it provision HTTPS automatically.
+
+### Nginx rollout steps
+
+1. Point your domain DNS record to the server IP.
+2. Obtain certificates with Let's Encrypt or your existing PKI.
+3. Copy `deploy/nginx.codefolio.conf` into `/etc/nginx/sites-available/`.
+4. Replace `your-domain.com` and certificate paths.
+5. Enable the site and reload Nginx.
+6. Confirm HTTPS traffic reaches the frontend on `127.0.0.1:8080`.
 
 ## 8. Recommended Next Step
 

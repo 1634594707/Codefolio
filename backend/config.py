@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # Durable snapshot storage
     DATABASE_URL: str = ""
     DATABASE_PATH: str = str(_BACKEND_ROOT / "data" / "codefolio.db")
+    POSTGRES_POOL_MIN_SIZE: int = 1
+    POSTGRES_POOL_MAX_SIZE: int = 10
 
     # Snapshot freshness / differential TTL strategy (Req 13.3)
     REPOSITORY_METADATA_TTL: int = 3600       # 1 hour  – repo metadata

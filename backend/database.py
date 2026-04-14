@@ -13,6 +13,11 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     psycopg = None
 
+try:
+    from psycopg_pool import ConnectionPool
+except ImportError:  # pragma: no cover - optional dependency
+    ConnectionPool = None
+
 
 ARTIFACT_GITHUB_USER = "github_user"
 ARTIFACT_REPOSITORY_PROFILE = "repository_profile"
@@ -316,18 +321,26 @@ class PostgresSnapshotBackend(SnapshotBackend):
     backend_name = "postgresql"
 
     def __init__(self, database_url: str):
-        if psycopg is None:
+        if psycopg is None or ConnectionPool is None:
             raise RuntimeError(
-                "DATABASE_URL is set to PostgreSQL but psycopg is not installed. "
-                "Install backend requirements with psycopg enabled first."
+                "DATABASE_URL is set to PostgreSQL but psycopg pool dependencies are not installed. "
+                "Install backend requirements with psycopg and psycopg-pool enabled first."
             )
         self.database_url = database_url
+        self.pool = ConnectionPool(
+            conninfo=self.database_url,
+            min_size=max(settings.POSTGRES_POOL_MIN_SIZE, 1),
+            max_size=max(settings.POSTGRES_POOL_MAX_SIZE, max(settings.POSTGRES_POOL_MIN_SIZE, 1)),
+            kwargs={"autocommit": False},
+            open=False,
+        )
 
-    def _connect(self):
-        return psycopg.connect(self.database_url)
+    def _connection(self):
+        return self.pool.connection()
 
     def initialize_schema(self) -> None:
-        with self._connect() as connection:
+        self.pool.open(wait=True)
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -375,7 +388,7 @@ class PostgresSnapshotBackend(SnapshotBackend):
             connection.commit()
 
     def fetch_row(self, artifact_type: str, tenant_scope: str, scope_key: str, language: str) -> tuple[str, Any] | None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -401,7 +414,7 @@ class PostgresSnapshotBackend(SnapshotBackend):
         now_iso: str,
     ) -> None:
         now = datetime.fromisoformat(now_iso)
-        with self._connect() as connection:
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -469,7 +482,7 @@ class PostgresSnapshotBackend(SnapshotBackend):
         )
 
     def _delete_with_rowcount(self, sql: str, params: tuple[Any, ...]) -> int:
-        with self._connect() as connection:
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(sql, params)
                 rowcount = cursor.rowcount
@@ -478,7 +491,7 @@ class PostgresSnapshotBackend(SnapshotBackend):
 
     def ensure_workspace_row(self, workspace_id: str, now_iso: str) -> None:
         now = datetime.fromisoformat(now_iso)
-        with self._connect() as connection:
+        with self._connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -490,6 +503,9 @@ class PostgresSnapshotBackend(SnapshotBackend):
                     (workspace_id, now, now),
                 )
             connection.commit()
+
+    def close(self) -> None:
+        self.pool.close()
 
 
 class SnapshotStore:
@@ -514,6 +530,9 @@ class SnapshotStore:
         self.ready = True
 
     async def close(self) -> None:
+        close_method = getattr(self.backend, "close", None)
+        if callable(close_method):
+            await asyncio.to_thread(close_method)
         self.ready = False
 
     async def get_snapshot(

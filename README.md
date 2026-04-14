@@ -121,6 +121,7 @@ Codefolio now supports a database compatibility layer for SQLite and PostgreSQL.
 
 - Default mode keeps using `DATABASE_PATH` with SQLite
 - PostgreSQL mode is enabled by setting `DATABASE_URL=postgresql://...`
+- PostgreSQL runtime now uses a connection pool controlled by `POSTGRES_POOL_MIN_SIZE` and `POSTGRES_POOL_MAX_SIZE`
 - Business code still uses the same snapshot store API
 
 Compose example with PostgreSQL:
@@ -132,6 +133,9 @@ docker compose --env-file .env.production -f docker-compose.prod.yml -f docker-c
 Files related to this path:
 
 - [docker-compose.postgres.yml](/D:/Administrator/Desktop/Project/Codefolio/docker-compose.postgres.yml)
+- [backend/scripts/migrate_sqlite_to_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/migrate_sqlite_to_postgres.py)
+- [backend/scripts/backup_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/backup_postgres.py)
+- [backend/scripts/restore_postgres.py](/D:/Administrator/Desktop/Project/Codefolio/backend/scripts/restore_postgres.py)
 - [deploy/Caddyfile.example](/D:/Administrator/Desktop/Project/Codefolio/deploy/Caddyfile.example)
 - [deploy/nginx.codefolio.conf](/D:/Administrator/Desktop/Project/Codefolio/deploy/nginx.codefolio.conf)
 
@@ -166,6 +170,8 @@ REDIS_URL=redis://localhost:6379
 REDIS_DB=0
 DATABASE_PATH=/app/data/codefolio.db
 DATABASE_URL=postgresql://codefolio:change-me@postgres:5432/codefolio
+POSTGRES_POOL_MIN_SIZE=1
+POSTGRES_POOL_MAX_SIZE=10
 CORS_ORIGINS=http://localhost:8080,https://your-domain.com
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800
