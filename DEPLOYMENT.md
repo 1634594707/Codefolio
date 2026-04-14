@@ -127,6 +127,11 @@ These scripts depend on local PostgreSQL client tools:
 - `pg_dump`
 - `pg_restore`
 
+Recommendation:
+
+- Keep the `pg_dump` / `pg_restore` major version aligned with the target PostgreSQL server major version.
+- A newer client can sometimes emit statements unsupported by an older server during restore.
+
 ## 6. Data Persistence
 
 Docker volumes:

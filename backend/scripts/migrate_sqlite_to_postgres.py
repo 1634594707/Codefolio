@@ -21,26 +21,40 @@ def load_sqlite_rows(sqlite_path: Path) -> tuple[list[dict], list[dict]]:
     connection = sqlite3.connect(sqlite_path)
     connection.row_factory = sqlite3.Row
     try:
+        snapshot_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(artifact_snapshots)").fetchall()
+        }
+        has_tenant_scope = "tenant_scope" in snapshot_columns
+        workspace_table_exists = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'workspaces'"
+        ).fetchone() is not None
+
+        snapshot_sql = """
+            SELECT artifact_type, {tenant_scope_select} scope_key, language, payload_json, created_at, updated_at
+            FROM artifact_snapshots
+            ORDER BY id
+        """.format(
+            tenant_scope_select="tenant_scope, " if has_tenant_scope else "'global' AS tenant_scope, "
+        )
         snapshots = [
             dict(row)
             for row in connection.execute(
-                """
-                SELECT artifact_type, tenant_scope, scope_key, language, payload_json, created_at, updated_at
-                FROM artifact_snapshots
-                ORDER BY id
-                """
+                snapshot_sql
             ).fetchall()
         ]
-        workspaces = [
-            dict(row)
-            for row in connection.execute(
-                """
-                SELECT workspace_id, created_at, last_seen_at
-                FROM workspaces
-                ORDER BY id
-                """
-            ).fetchall()
-        ]
+        workspaces = []
+        if workspace_table_exists:
+            workspaces = [
+                dict(row)
+                for row in connection.execute(
+                    """
+                    SELECT workspace_id, created_at, last_seen_at
+                    FROM workspaces
+                    ORDER BY id
+                    """
+                ).fetchall()
+            ]
         return snapshots, workspaces
     finally:
         connection.close()
