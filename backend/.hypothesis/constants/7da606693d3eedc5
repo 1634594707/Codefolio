@@ -1,4 +1,0 @@
-# file: D:\Administrator\Desktop\Project\Codefolio\backend\services\action_generator.py
-# hypothesis_version: 6.151.14
-
-['30d', '7d', '90d', 'L', 'M', 'S', 'community', 'compliance', 'discovery', 'en', 'engineering_quality', 'first_impression', 'onboarding', 'positioning', 'releases', 'zh', '发布带说明的版本或 changelog', '发布记录和变更说明会强化项目成熟度判断。', '在仓库中暴露测试、类型检查或安全检查方式', '增加更具体的 GitHub topics', '增强仓库可发现性', '强化 README 首屏表达', '把仓库描述改写成一句明确的价值主张', '把仓库描述聚焦到真实使用场景', '把徽章聚焦到可信度和采用度信号', '收紧项目定位表达', '明确许可与合规状态', '标杆仓库显著降低了首次体验和配置成本。', '标杆仓库通常更清楚地告诉贡献者如何参与。', '添加标准许可证文件', '清晰记录版本之间的变化', '缺失或模糊的许可证会直接降低复用意愿。', '补充或公开 CI workflow', '补足工程可信度信号', '补齐可执行的快速上手路径', '让发布节奏更可见', '说明提交问题和变更的推荐方式', '降低协作接入门槛']

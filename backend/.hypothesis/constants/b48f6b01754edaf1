@@ -1,4 +1,0 @@
-# file: D:\Administrator\Desktop\Project\Codefolio\backend\routers\repos_benchmark.py
-# hypothesis_version: 6.151.14
-
-[160, 400, 404, 429, 500, 503, 1000, 12000, 20000, '+00:00', '/', '/api/repos', '/benchmark', '/profile', '/suggest-benchmarks', 'Z', 'cells', 'code', 'deleted_keys', 'details', 'dimension_id', 'en', 'error_type', 'feature_matrix', 'fetched_at', 'full_name', 'github.com', 'github.com/', 'http://', 'https://', 'invalid_input', 'invalid_repo', 'label', 'label_key', 'level', 'medium', 'message', 'missing', 'on_startup', 'rate_limit_exceeded', 'raw', 'reason_code', 'reason_params', 'repo', 'repository', 'repository_not_found', 'rows', 'score', 'stars', 'strong', 'suggestions', 'timeout_error', 'too_many_benchmarks', 'unknown', 'user_not_found', 'weak', 'www.github.com', 'www.github.com/', 'zh']

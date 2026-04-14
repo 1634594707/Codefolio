@@ -1,4 +1,0 @@
-# file: D:\Administrator\Desktop\Project\Codefolio\backend\services\benchmark_recommendation_service.py
-# hypothesis_version: 6.151.14
-
-[15.0, 100, 200, 403, 1000, 3600, 'Accept', 'Authorization', 'desc', 'en', 'full_name', 'items', 'language', 'large', 'medium', 'name', 'order', 'per_page', 'q', 'reason_code', 'reason_params', 'same_language_size', 'small', 'sort', 'stargazers_count', 'stars', 'topics']
