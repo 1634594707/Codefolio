@@ -1,5 +1,21 @@
 # Changelog
 
+## [v1.3.0] - 2026-04-15
+
+### Added
+
+- OAuth-based GitHub sign-in, token-aware repository fetching, and re-auth prompts for expired sessions
+- Server-sent event generation progress, workspace import/export, and repository analysis LRU caching
+- Error boundary and offline banner UX safeguards across the frontend
+- Property-based regression coverage for request deduplication, XSS sanitization, workspace snapshots, cache bounds, history parsing, GitScore invariants, and social card theming
+
+### Changed
+
+- GitScore weighting now includes issue participation, quality density, and higher documentation ceiling
+- Export flow now sanitizes rendered resume HTML and delegates PDF generation to the backend POST export endpoint
+- Social card rendering now honors light and dark theme selection end to end
+- Shared frontend config, i18n wiring, history utilities, and responsive topbar behavior were consolidated for consistency
+
 ## [v1.2.0] - 2026-04-14
 
 ### Added

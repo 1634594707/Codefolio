@@ -6,12 +6,12 @@ import { isRequestAborted } from '../utils/axiosAbort'
 import type { GenerateResponse, LocalizedOutput as FullLocalizedOutput } from '../types/generate'
 import type { BenchmarkResponse } from '../types/benchmark'
 import { generateBenchmarkMarkdown } from '../utils/benchmarkExport'
+import { sanitizeHtml } from '../utils/exportSanitizer'
+import { API_BASE_URL } from '../config/api'
 
 interface ExportProps {
   language: 'en' | 'zh'
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 const labels = {
   en: {
@@ -145,7 +145,9 @@ export function Export({ language }: ExportProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [markdownCopied, setMarkdownCopied] = useState(false)
+  const [safeHtml, setSafeHtml] = useState('')
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState('')
   const [exportingCard, setExportingCard] = useState(false)
   const [includeBenchmark, setIncludeBenchmark] = useState(false)
   const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResponse | null>(null)
@@ -258,52 +260,59 @@ export function Export({ language }: ExportProps) {
     }
   }, [includeBenchmark, searchParams, contentLanguage, text.benchmarkError, savedBenchmarkEntry])
 
-  const exportPdf = async () => {
-    if (!resumeRef.current || !data) return
+  const selectedProjectsMarkdown =
+    selectedProjects.length > 0
+      ? `\n\n## ${language === 'zh' ? '精选项目' : 'Selected Projects'}\n\n${selectedProjects
+          .map(
+            (project) =>
+              `### ${project.repoName}\n- ${project.analysisSummary}\n- ${project.highlights.join('\n- ')}\n- ${language === 'zh' ? '项目地址' : 'Project URL'}: ${project.url}`,
+          )
+          .join('\n\n')}`
+      : ''
 
-    const exportTarget = resumeRef.current
-    exportTarget.classList.add('is-exporting')
+  const benchmarkMarkdown =
+    includeBenchmark && benchmarkResult
+      ? `\n\n---\n\n${generateBenchmarkMarkdown(benchmarkResult, language)}`
+      : ''
+
+  const resumeMarkdown = `${activeOutput?.resume_markdown ?? ''}${selectedProjectsMarkdown}${benchmarkMarkdown}`
+  const resumeHtml = markdownToHtml(resumeMarkdown)
+
+  useEffect(() => {
+    void sanitizeHtml(resumeHtml).then(setSafeHtml)
+  }, [resumeHtml])
+
+  const exportPdf = async () => {
+    if (!data) return
+
     setExportingPdf(true)
+    setPdfError('')
 
     try {
-      await document.fonts.ready
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ])
+      const response = await axios.post(
+        `${API_BASE_URL}/api/export/pdf`,
+        {
+          username,
+          language: contentLanguage,
+          extra_markdown: selectedProjectsMarkdown || undefined,
+        },
+        { responseType: 'blob' },
+      )
 
-      const contentHeight = exportTarget.scrollHeight
-      const contentWidth = exportTarget.scrollWidth
-      const a4Width = 794
-      const a4Height = 1123
-      const scale = a4Width / contentWidth
-      const scaledContentHeight = contentHeight * scale
-      const totalPages = Math.ceil(scaledContentHeight / a4Height)
-      const pdf = new jsPDF('p', 'px', [a4Width, a4Height])
-
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) pdf.addPage()
-
-        const scrollY = (page * a4Height) / scale
-        const canvas = await html2canvas(exportTarget, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          y: scrollY,
-          height: Math.min(a4Height / scale, contentHeight - scrollY),
-        })
-
-        const imageData = canvas.toDataURL('image/png')
-        const imgWidth = a4Width
-        const imgHeight = (canvas.height * imgWidth) / canvas.width
-        pdf.addImage(imageData, 'PNG', 0, 0, imgWidth, imgHeight)
+      const url = URL.createObjectURL(response.data as Blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `codefolio-${username}-${contentLanguage}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      if (!isRequestAborted(err)) {
+        setPdfError(language === 'zh' ? 'PDF 导出失败，请重试' : 'PDF export failed, please try again')
       }
-
-      pdf.save(`codefolio-${data.user.username}-${contentLanguage}.pdf`)
     } finally {
       setExportingPdf(false)
-      exportTarget.classList.remove('is-exporting')
     }
   }
 
@@ -378,24 +387,6 @@ export function Export({ language }: ExportProps) {
     )
   }
 
-  const selectedProjectsMarkdown =
-    selectedProjects.length > 0
-      ? `\n\n## ${language === 'zh' ? '精选项目' : 'Selected Projects'}\n\n${selectedProjects
-          .map(
-            (project) =>
-              `### ${project.repoName}\n- ${project.analysisSummary}\n- ${project.highlights.join('\n- ')}\n- ${language === 'zh' ? '项目地址' : 'Project URL'}: ${project.url}`,
-          )
-          .join('\n\n')}`
-      : ''
-
-  const benchmarkMarkdown =
-    includeBenchmark && benchmarkResult
-      ? `\n\n---\n\n${generateBenchmarkMarkdown(benchmarkResult, language)}`
-      : ''
-
-  const resumeMarkdown = `${activeOutput.resume_markdown}${selectedProjectsMarkdown}${benchmarkMarkdown}`
-  const resumeHtml = markdownToHtml(resumeMarkdown)
-
   return (
     <div className="page-container">
       <div className="page-header">
@@ -416,9 +407,21 @@ export function Export({ language }: ExportProps) {
           </div>
           <h3 className="export-title">{text.pdfTitle}</h3>
           <p className="export-desc">{text.pdfDesc}</p>
-          <button className="export-btn primary" onClick={exportPdf}>
+          <button className="export-btn primary" onClick={exportPdf} disabled={exportingPdf}>
             {exportingPdf ? text.loading : text.downloadPdf}
           </button>
+          {pdfError && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+              <p style={{ color: 'var(--color-error, #ef4444)', marginBottom: '0.25rem' }}>{pdfError}</p>
+              <button
+                className="export-btn secondary"
+                style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
+                onClick={() => { setPdfError(''); void exportPdf() }}
+              >
+                {language === 'zh' ? '重试' : 'Retry'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="export-card">
@@ -496,7 +499,7 @@ export function Export({ language }: ExportProps) {
             <div className="markdown-paper">
               <article
                 className="markdown-preview"
-                dangerouslySetInnerHTML={{ __html: resumeHtml }}
+                dangerouslySetInnerHTML={{ __html: safeHtml }}
               />
             </div>
           </div>

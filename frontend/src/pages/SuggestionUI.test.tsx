@@ -8,6 +8,12 @@ import { MemoryRouter } from 'react-router-dom'
 import axios from 'axios'
 import { CompareRepos } from './CompareRepos'
 
+vi.mock('../context', () => ({
+  useApp: () => ({
+    saveBenchmarkWorkspaceEntry: vi.fn(),
+  }),
+}))
+
 vi.mock('axios', async () => {
   const actual = await vi.importActual<typeof import('axios')>('axios')
   return {

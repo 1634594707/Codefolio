@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # GitHub API
     GITHUB_TOKEN: str = ""
 
+    # GitHub OAuth
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    GITHUB_OAUTH_REDIRECT_URI: str = "http://localhost:5173/api/auth/github/callback"
+
     # AI API（兼容 OpenAI 风格：DeepSeek、火山方舟 /api/v3/chat/completions 等）
     AI_API_KEY: str = ""
     AI_API_BASE_URL: str = "https://api.deepseek.com/v1"

@@ -28,6 +28,7 @@ class Contributions:
     total_prs_last_year: int
     longest_streak: int
     contribution_days: List[ContributionDay]
+    issues_opened_last_year: int = 0
 
 @dataclass
 class UserData:

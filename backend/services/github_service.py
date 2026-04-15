@@ -159,12 +159,15 @@ class GitHubService:
                 logger.error(f"Unexpected error fetching repository data: {redact_token(str(e))}")
                 raise RuntimeError(f"Failed to fetch GitHub repository data: {redact_token(str(e))}")
     
-    async def fetch_user_data(self, username: str) -> UserData:
+    async def fetch_user_data(self, username: str, user_token: str | None = None) -> UserData:
         """
         Fetch comprehensive user data from GitHub GraphQL API.
         
         Args:
             username: GitHub username to fetch data for
+            user_token: Optional user OAuth token. When provided, it is used
+                instead of the server-side GITHUB_TOKEN, which also enables
+                fetching private repositories owned by the authenticated user.
             
         Returns:
             UserData object containing profile, repositories, contributions, and languages
@@ -173,6 +176,12 @@ class GitHubService:
             ValueError: If username is invalid or user not found
             RuntimeError: If GitHub API request fails or rate limit exceeded
         """
+        # When a user token is provided we bypass the shared cache so that
+        # private-repo data is never stored under the public cache key.
+        if user_token:
+            logger.info(f"Fetching user data for '{username}' using user-supplied token (private repos included)")
+            return await self._fetch_user_data_with_token(username, user_token)
+
         # Check cache first (with version to force refresh on code updates)
         cache_key = github_user_cache_key(username)
         cached_data = await redis_client.get(cache_key)
@@ -286,6 +295,98 @@ class GitHubService:
                 raise
             except Exception as e:
                 logger.error(f"Unexpected error fetching GitHub data: {redact_token(str(e))}")
+                raise RuntimeError(f"Failed to fetch GitHub data: {redact_token(str(e))}")
+
+    async def _fetch_user_data_with_token(self, username: str, user_token: str) -> UserData:
+        """
+        Fetch user data using a user-supplied OAuth token.
+
+        Unlike the public ``fetch_user_data`` path this method:
+        - Uses the caller's token instead of the server-side GITHUB_TOKEN.
+        - Fetches *all* repositories (including private ones) by using
+          ``ownerAffiliations: [OWNER]`` together with the user token that
+          carries the ``repo`` scope.
+        - Does **not** read from or write to the shared Redis / DB cache so
+          that private repository data is never persisted under a public key.
+
+        Args:
+            username: GitHub username to fetch data for.
+            user_token: A valid GitHub OAuth access token with at least
+                ``read:user`` and ``repo`` scopes.
+
+        Returns:
+            UserData object (may include private repositories).
+
+        Raises:
+            ValueError: If the user is not found.
+            RuntimeError: If the API call fails.
+        """
+        user_headers = {
+            "Authorization": f"Bearer {user_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github+json",
+        }
+
+        # Use the same GraphQL query but with the private-repo variant so that
+        # private repositories owned by the authenticated user are included.
+        query = self._build_graphql_query_with_private()
+        variables = {"username": username}
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(
+                    self.api_url,
+                    json={"query": query, "variables": variables},
+                    headers=user_headers,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                if "errors" in data:
+                    error_msg = data["errors"][0].get("message", "Unknown error")
+                    if "Could not resolve to a User" in error_msg:
+                        raise ValueError(
+                            f"GitHub user '{username}' not found. "
+                            f"Please check the username and try again."
+                        )
+                    raise RuntimeError(f"GitHub API error: {error_msg}")
+
+                return self._normalize_response(data["data"], username)
+
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    raise RuntimeError(
+                        "GitHub API authentication failed. "
+                        "The provided user token is invalid or has expired. "
+                        "Please re-authenticate."
+                    )
+                elif e.response.status_code == 403:
+                    error_data = e.response.json() if e.response.text else {}
+                    if "rate limit" in str(error_data).lower():
+                        raise RuntimeError(
+                            "GitHub API rate limit exceeded. "
+                            "Please try again later."
+                        )
+                    raise RuntimeError(f"GitHub API access forbidden: {redact_token(str(error_data))}")
+                elif e.response.status_code == 404:
+                    raise ValueError(
+                        f"GitHub user '{username}' not found. "
+                        f"Please check the username and try again."
+                    )
+                else:
+                    raise RuntimeError(
+                        f"GitHub API request failed with status {e.response.status_code}: "
+                        f"{redact_token(e.response.text)}"
+                    )
+            except httpx.TimeoutException:
+                raise RuntimeError(
+                    "GitHub API request timed out after 30 seconds. "
+                    "Please check your network connection and try again."
+                )
+            except (ValueError, RuntimeError):
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error fetching GitHub data with user token: {redact_token(str(e))}")
                 raise RuntimeError(f"Failed to fetch GitHub data: {redact_token(str(e))}")
 
     def _build_graphql_query(self) -> str:
@@ -457,6 +558,7 @@ class GitHubService:
             contributionsCollection {
               totalCommitContributions
               totalPullRequestContributions
+              totalIssueContributions
               contributionCalendar {
                 totalContributions
                 weeks {
@@ -470,7 +572,23 @@ class GitHubService:
           }
         }
         """
-    
+
+    def _build_graphql_query_with_private(self) -> str:
+        """
+        Build a GraphQL query that includes private repositories.
+
+        This is identical to ``_build_graphql_query`` except that the
+        ``repositories`` field uses ``privacy: null`` (the default) so that
+        both public and private repositories owned by the authenticated user
+        are returned.  The caller must supply a token with the ``repo`` scope
+        for private repos to actually appear in the response.
+        """
+        # The standard query already omits a ``privacy`` filter, so private
+        # repos are naturally included when the token has the ``repo`` scope.
+        # We keep a separate method here for clarity and future extensibility
+        # (e.g. adding ``affiliations: [OWNER, COLLABORATOR]``).
+        return self._build_graphql_query()
+
     def _normalize_response(self, data: Dict[str, Any], username: str) -> UserData:
         """
         Normalize GitHub API response to UserData model.
@@ -576,6 +694,7 @@ class GitHubService:
             total_prs_last_year=user.get("contributionsCollection", {}).get("totalPullRequestContributions", 0),
             longest_streak=longest_streak,
             contribution_days=contribution_days,
+            issues_opened_last_year=user.get("contributionsCollection", {}).get("totalIssueContributions", 0),
         )
         
         # Build UserData object
@@ -1047,6 +1166,7 @@ class GitHubService:
                 "total_commits_last_year": user_data.contributions.total_commits_last_year,
                 "total_prs_last_year": user_data.contributions.total_prs_last_year,
                 "longest_streak": user_data.contributions.longest_streak,
+                "issues_opened_last_year": user_data.contributions.issues_opened_last_year,
                 "contribution_days": [
                     {
                         "date": day.date,
@@ -1098,6 +1218,7 @@ class GitHubService:
             total_prs_last_year=raw_contributions["total_prs_last_year"],
             longest_streak=raw_contributions["longest_streak"],
             contribution_days=contribution_days,
+            issues_opened_last_year=raw_contributions.get("issues_opened_last_year", 0),
         )
         
         return UserData(
@@ -1159,6 +1280,100 @@ class GitHubService:
                 logger.error(f"Failed to check rate limit: {redact_token(str(e))}")
                 raise RuntimeError(f"Rate limit check failed: {redact_token(str(e))}")
     
+    @staticmethod
+    def compute_star_history_from_user_data(user_data: "UserData") -> list[dict]:
+        """
+        Compute a monthly star history approximation from existing UserData.
+
+        Since GitHub's API does not expose per-month star counts without
+        expensive per-repository stargazer pagination, this method produces a
+        lightweight estimate by distributing each repository's total star count
+        uniformly across the months between the repository's last-push date and
+        the current month (capped at 12 months).  Repositories with no
+        ``pushed_at`` date fall back to a uniform distribution across all 12
+        months.
+
+        This is a placeholder implementation suitable for rendering a trend
+        chart.  It can be replaced later with real GitHub star-history API
+        calls (e.g. ``GET /repos/{owner}/{repo}/stargazers`` with
+        ``Accept: application/vnd.github.star+json``) without changing the
+        return contract.
+
+        Args:
+            user_data: A fully-populated ``UserData`` object (as returned by
+                ``fetch_user_data``).  The method reads
+                ``user_data.repositories`` to obtain per-repo star counts and
+                push dates.
+
+        Returns:
+            A list of 12 dicts, one per calendar month, sorted ascending by
+            month.  Each dict has the shape::
+
+                {"month": "YYYY-MM", "stars": int}
+
+            where ``stars`` is the estimated number of stars gained during
+            that month.  The list always contains exactly 12 entries covering
+            the 12 calendar months ending with the current month (inclusive).
+
+        Example::
+
+            history = GitHubService.compute_star_history_from_user_data(user_data)
+            # [{"month": "2024-02", "stars": 5}, {"month": "2024-03", "stars": 7}, ...]
+
+        Requirements: 10.2
+        """
+        now = datetime.now(timezone.utc)
+
+        # Build the ordered list of the last 12 months (YYYY-MM strings).
+        months: list[str] = []
+        for offset in range(11, -1, -1):
+            # Subtract 'offset' months from the current month.
+            month_num = now.month - offset
+            year = now.year
+            while month_num <= 0:
+                month_num += 12
+                year -= 1
+            months.append(f"{year:04d}-{month_num:02d}")
+
+        # Initialise star counts to zero for each month.
+        star_counts: dict[str, int] = {m: 0 for m in months}
+        earliest_month = months[0]
+
+        for repo in user_data.repositories:
+            total_stars = repo.stars
+            if total_stars <= 0:
+                continue
+
+            # Determine the repo's "active since" month from pushed_at.
+            # pushed_at is stored as "YYYY-MM-DD" (first 10 chars).
+            repo_start_month: str | None = None
+            if repo.pushed_at and len(repo.pushed_at) >= 7:
+                candidate = repo.pushed_at[:7]  # "YYYY-MM"
+                # Only use it if it falls within our 12-month window.
+                if candidate >= earliest_month:
+                    repo_start_month = candidate
+
+            # Collect the months this repo is "active" in (within our window).
+            if repo_start_month is not None:
+                active_months = [m for m in months if m >= repo_start_month]
+            else:
+                active_months = months
+
+            if not active_months:
+                active_months = months
+
+            # Distribute stars uniformly across active months.
+            n = len(active_months)
+            base = total_stars // n
+            remainder = total_stars % n
+
+            for i, month in enumerate(active_months):
+                # Give the remainder to the most recent months.
+                extra = 1 if i >= (n - remainder) else 0
+                star_counts[month] = star_counts.get(month, 0) + base + extra
+
+        return [{"month": m, "stars": star_counts[m]} for m in months]
+
     @staticmethod
     def create_error_response(error: Exception) -> Dict[str, Any]:
         """

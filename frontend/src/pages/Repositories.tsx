@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
+
+import { RESUME_PROJECTS_MAX_PER_USER } from '../config/constants'
+
 import { useNavigate, useSearchParams } from 'react-router-dom'
+
 import axios from 'axios'
+
 import { useApp, type ResumeProject } from '../context'
+
 import { isRequestAborted } from '../utils/axiosAbort'
+
 import {
   buildResumeProject,
   buildResumeProjectFromAnalysis,
   type RepositoryAnalysisPayload,
 } from '../utils/resumeProjects'
+import { API_BASE_URL } from '../config/api'
 
 interface Repo {
   name: string
@@ -39,8 +47,6 @@ interface RepositoriesProps {
 
 type SortMode = 'stars' | 'updated' | 'forks'
 type RepoViewMode = 'featured' | 'active' | 'maintained'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 const labels = {
   en: {
@@ -140,6 +146,8 @@ export function Repositories({ language }: RepositoriesProps) {
     cacheGenerateResult,
     getResumeProjects,
     toggleResumeProject,
+    setRepoAnalysis,
+    getRepoAnalysis,
   } = useApp()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -157,6 +165,22 @@ export function Repositories({ language }: RepositoriesProps) {
   const [repoAnalysisMap, setRepoAnalysisMap] = useState<Record<string, RepositoryAnalysisPayload>>({})
   const text = labels[language]
   const selectedProjects = getResumeProjects(username)
+
+  // Requirement 6.3: On mount, initialize local repoAnalysisMap from AppContext cache
+  useEffect(() => {
+    if (!username || repos.length === 0) return
+    const initialMap: Record<string, RepositoryAnalysisPayload> = {}
+    for (const repo of repos) {
+      const cacheKey = `${username.toLowerCase()}/${repo.name.toLowerCase()}`
+      const cached = getRepoAnalysis(cacheKey)
+      if (cached) {
+        initialMap[repo.name] = cached
+      }
+    }
+    if (Object.keys(initialMap).length > 0) {
+      setRepoAnalysisMap((prev) => ({ ...initialMap, ...prev }))
+    }
+  }, [username, repos, getRepoAnalysis])
 
   useEffect(() => {
     if (!username) return
@@ -267,22 +291,27 @@ export function Repositories({ language }: RepositoriesProps) {
         repo_name: repo.name,
         language: contentLanguage,
       })
-      setRepoAnalysisMap((prev) => ({ ...prev, [repo.name]: response.data }))
+      const payload = response.data
+      // Requirement 6.2: Write analysis result to AppContext cache
+      const cacheKey = `${username.toLowerCase()}/${repo.name.toLowerCase()}`
+      setRepoAnalysis(cacheKey, payload)
+      setRepoAnalysisMap((prev) => ({ ...prev, [repo.name]: payload }))
     } catch {
       const fallback = buildResumeProject(username, repo, language)
-      setRepoAnalysisMap((prev) => ({
-        ...prev,
-        [repo.name]: {
-          repository: repo,
-          analysis: {
-            repo_name: repo.name,
-            title: fallback.analysisTitle,
-            summary: fallback.analysisSummary,
-            highlights: fallback.highlights,
-            keywords: fallback.keywords,
-          },
+      const fallbackPayload: RepositoryAnalysisPayload = {
+        repository: repo,
+        analysis: {
+          repo_name: repo.name,
+          title: fallback.analysisTitle,
+          summary: fallback.analysisSummary,
+          highlights: fallback.highlights,
+          keywords: fallback.keywords,
         },
-      }))
+      }
+      // Also cache fallback results so they persist across navigation
+      const cacheKey = `${username.toLowerCase()}/${repo.name.toLowerCase()}`
+      setRepoAnalysis(cacheKey, fallbackPayload)
+      setRepoAnalysisMap((prev) => ({ ...prev, [repo.name]: fallbackPayload }))
     } finally {
       setAnalysisLoadingRepo(null)
     }
@@ -507,7 +536,7 @@ export function Repositories({ language }: RepositoriesProps) {
         <section className="selected-projects-panel">
           <div className="section-header">
             <h2 className="section-title">
-              {text.selectedProjects}: {selectedProjects.length}/4
+              {text.selectedProjects}: {selectedProjects.length}/{RESUME_PROJECTS_MAX_PER_USER}
             </h2>
           </div>
           <div className="selected-projects-grid">

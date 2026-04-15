@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
+import type { GenerateResponse } from '../types/generate'
 import {
   BarChart,
   Bar,
@@ -14,11 +15,14 @@ import {
   PolarAngleAxis,
   Radar,
   Legend,
+  LineChart,
+  Line,
 } from 'recharts'
 import { useApp } from '../context'
 import { isRequestAborted } from '../utils/axiosAbort'
 import { githubLoginEquals } from '../utils/githubLogin'
 import { splitGitHubUsernameInputs, validateGitHubUsername } from '../utils/githubInput'
+import { API_BASE_URL } from '../config/api'
 
 interface CompareUser {
   username: string
@@ -39,6 +43,7 @@ interface CompareUser {
   repositories_count: number
   total_stars: number
   languages: Record<string, number>
+  star_history?: Array<{ month: string; stars: number }>
 }
 
 interface CompareProps {
@@ -47,7 +52,6 @@ interface CompareProps {
 
 type DimensionKey = keyof CompareUser['dimensions']
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 const dimensionKeys: DimensionKey[] = [
   'impact',
   'contribution',
@@ -93,6 +97,7 @@ const labels = {
     invalidInput: 'Use GitHub usernames or profile links only.',
     partialFailure: 'Some users could not be loaded',
     maxUsers: 'Maximum 3 users',
+    starHistoryTrend: 'Star History Trend',
   },
   zh: {
     title: '开发者对比',
@@ -130,6 +135,7 @@ const labels = {
     invalidInput: '请输入 GitHub 用户名或主页链接。',
     partialFailure: '以下用户加载失败',
     maxUsers: '最多 3 个用户',
+    starHistoryTrend: 'Star 历史趋势',
   },
 } as const
 
@@ -195,10 +201,10 @@ export function Compare({ language }: CompareProps) {
         const results = await Promise.allSettled(
           usernames.slice(0, 3).map(async (username) => {
             const cachedEntry = getGenerateCache(username, contentLanguage)
-            const data =
+            const data: GenerateResponse =
               cachedEntry?.data ??
               (
-                await axios.post(
+                await axios.post<GenerateResponse>(
                   `${API_BASE_URL}/api/generate`,
                   {
                     username: username.trim(),
@@ -239,7 +245,8 @@ export function Compare({ language }: CompareProps) {
                 0,
               ),
               languages: data.user.languages,
-            }
+              star_history: data.user.star_history,
+            } as CompareUser
           }),
         )
         if (cancelled) return
@@ -361,6 +368,36 @@ export function Compare({ language }: CompareProps) {
   }))
 
   const colors = ['#0f766e', '#c2410c', '#1d4ed8']
+
+  // Merge star history from all users into a single dataset for the line chart
+  // Format: [{ month: "YYYY-MM", username1: stars1, username2: stars2 }]
+  const starHistoryData = useMemo(() => {
+    const usersWithHistory = users.filter((user) => user.star_history && user.star_history.length > 0)
+    if (usersWithHistory.length === 0) return []
+
+    // Collect all unique months across all users
+    const monthSet = new Set<string>()
+    for (const user of usersWithHistory) {
+      for (const entry of user.star_history!) {
+        monthSet.add(entry.month)
+      }
+    }
+
+    // Sort months chronologically
+    const sortedMonths = [...monthSet].sort()
+
+    // Build merged dataset
+    return sortedMonths.map((month) => {
+      const point: Record<string, string | number> = { month }
+      for (const user of usersWithHistory) {
+        const entry = user.star_history!.find((e) => e.month === month)
+        if (entry !== undefined) {
+          point[user.username] = entry.stars
+        }
+      }
+      return point
+    })
+  }, [users])
 
   const compareInsights = useMemo(() => {
     if (users.length === 0) return null
@@ -609,6 +646,42 @@ export function Compare({ language }: CompareProps) {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {starHistoryData.length > 0 && (
+            <div className="compare-chart-section">
+              <h3 className="compare-chart-title">{text.starHistoryTrend}</h3>
+              <div className="compare-bar-wrapper">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={starHistoryData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" />
+                    <XAxis dataKey="month" tick={{ fill: 'var(--color-on-surface-variant)', fontSize: 12 }} />
+                    <YAxis tick={{ fill: 'var(--color-on-surface-variant)', fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'var(--color-surface-container)',
+                        border: '1px solid var(--color-outline-variant)',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Legend />
+                    {users
+                      .filter((user) => user.star_history && user.star_history.length > 0)
+                      .map((user) => (
+                        <Line
+                          key={user.username}
+                          type="monotone"
+                          dataKey={user.username}
+                          stroke={colors[users.indexOf(user)]}
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 4 }}
+                        />
+                      ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           <div className="compare-stats-section">
             <div className="compare-stats-grid">

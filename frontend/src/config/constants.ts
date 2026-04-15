@@ -1,0 +1,1 @@
+export const RESUME_PROJECTS_MAX_PER_USER = 6

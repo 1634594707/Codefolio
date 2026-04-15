@@ -83,15 +83,41 @@
   .topbar {
     padding: 12px 16px;
   }
-  
+
+  /* Search bar: visible, full-width, flex-grow to fill available space */
   .topbar-search {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    display: flex;
+  }
+
+  /* Ensure the search input wrapper is visible on mobile */
+  .search-input-wrapper {
+    display: flex;
     flex: 1;
   }
-  
-  .search-input-wrapper {
+
+  /* Minimum touch target 44×44px (WCAG 2.1 AA) */
+  .topbar-search-input {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .topbar-generate-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Hide non-core topbar elements on mobile, keep search and analyze button */
+  .topbar-brand-text {
     display: none;
   }
-  
+
+  .hide-on-mobile {
+    display: none;
+  }
+
   .content-lang-switch {
     display: none;
   }

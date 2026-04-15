@@ -68,4 +68,5 @@ export type GenerateResponse = {
     language: string
     data: Array<{ month: string; percentage: number }>
   }>
+  star_history?: Array<{ month: string; stars: number }>
 }

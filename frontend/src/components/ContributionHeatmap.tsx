@@ -1,9 +1,17 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { formatContributionTooltip } from '../utils/contributionHeatmap'
 
 interface ContributionHeatmapProps {
   /** Daily contribution counts in calendar order (GitHub API order). Empty = no data. */
   contributions: number[]
   language: 'en' | 'zh'
+}
+
+interface TooltipState {
+  date: string
+  count: number
+  x: number
+  y: number
 }
 
 const labels = {
@@ -31,8 +39,28 @@ const labels = {
   },
 }
 
+/** Compute ISO date strings for each contribution entry.
+ *  The last entry in the array corresponds to today; earlier entries go back one day each. */
+function computeDates(count: number): string[] {
+  const dates: string[] = []
+  const today = new Date()
+  // Normalize to midnight local time to avoid DST edge cases
+  today.setHours(0, 0, 0, 0)
+  for (let i = 0; i < count; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - (count - 1 - i))
+    dates.push(d.toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+const TOOLTIP_WIDTH = 200
+const TOOLTIP_HEIGHT = 36
+const TOOLTIP_OFFSET = 12
+
 export function ContributionHeatmap({ contributions, language }: ContributionHeatmapProps) {
   const text = labels[language]
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
   const { grid, stats, hasData } = useMemo(() => {
     const data = contributions.length > 0 ? contributions : []
@@ -60,10 +88,15 @@ export function ContributionHeatmap({ contributions, language }: ContributionHea
       }
     }
 
+    // Compute date strings for each day
+    const dateStrings = computeDates(data.length)
+
     // Organize into weeks (7 days per week, 53 weeks max)
-    const weeks: number[][] = []
+    const weeks: { count: number; date: string }[][] = []
     for (let i = 0; i < data.length; i += 7) {
-      weeks.push(data.slice(i, i + 7))
+      const weekCounts = data.slice(i, i + 7)
+      const weekDates = dateStrings.slice(i, i + 7)
+      weeks.push(weekCounts.map((count, j) => ({ count, date: weekDates[j] })))
     }
 
     return {
@@ -110,6 +143,46 @@ export function ContributionHeatmap({ contributions, language }: ContributionHea
     ? ['一', '三', '五']
     : ['Mon', 'Wed', 'Fri']
 
+  /** Compute tooltip position, clamping to viewport bounds */
+  const getTooltipStyle = (x: number, y: number): React.CSSProperties => {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+
+    let left = x + TOOLTIP_OFFSET
+    let top = y - TOOLTIP_HEIGHT - TOOLTIP_OFFSET
+
+    // Shift left if tooltip would overflow right edge
+    if (left + TOOLTIP_WIDTH > vw) {
+      left = x - TOOLTIP_WIDTH - TOOLTIP_OFFSET
+    }
+
+    // Shift down if tooltip would overflow top edge
+    if (top < 0) {
+      top = y + TOOLTIP_OFFSET
+    }
+
+    // Clamp to bottom edge
+    if (top + TOOLTIP_HEIGHT > vh) {
+      top = vh - TOOLTIP_HEIGHT - 4
+    }
+
+    return {
+      position: 'fixed',
+      left,
+      top,
+      pointerEvents: 'none',
+      zIndex: 9999,
+      background: 'var(--color-surface-container-high, #2a2a2a)',
+      color: 'var(--color-on-surface, #e0e0e0)',
+      padding: '4px 10px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      whiteSpace: 'nowrap',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      border: '1px solid var(--color-outline-variant, #444)',
+    }
+  }
+
   return (
     <div className="contribution-heatmap">
       {/* Stats */}
@@ -149,14 +222,22 @@ export function ContributionHeatmap({ contributions, language }: ContributionHea
           <div className="heatmap-grid">
             {grid.map((week, weekIndex) => (
               <div key={weekIndex} className="heatmap-week">
-                {week.map((count, dayIndex) => {
-                  const level = getLevel(count)
+                {week.map((cell, dayIndex) => {
+                  const level = getLevel(cell.count)
                   return (
                     <div
                       key={`${weekIndex}-${dayIndex}`}
                       className="heatmap-cell"
                       style={{ backgroundColor: getColor(level) }}
-                      title={`${count} ${text.contributions}`}
+                      onMouseEnter={(e) => {
+                        setTooltip({
+                          date: cell.date,
+                          count: cell.count,
+                          x: e.clientX,
+                          y: e.clientY,
+                        })
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
                     />
                   )
                 })}
@@ -178,6 +259,13 @@ export function ContributionHeatmap({ contributions, language }: ContributionHea
           <span>{text.more}</span>
         </div>
       </div>
+
+      {/* Custom Tooltip */}
+      {tooltip && (
+        <div style={getTooltipStyle(tooltip.x, tooltip.y)}>
+          {formatContributionTooltip(language, tooltip.date, tooltip.count)}
+        </div>
+      )}
     </div>
   )
 }

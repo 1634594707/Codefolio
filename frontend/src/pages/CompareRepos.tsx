@@ -10,12 +10,11 @@ import { isRequestAborted } from '../utils/axiosAbort'
 import { parseGitHubRepoInput } from '../utils/githubInput'
 import { generateBenchmarkMarkdown } from '../utils/benchmarkExport'
 import { formatCacheAge, isStale } from '../utils/formatCacheAge'
+import { API_BASE_URL } from '../config/api'
 
 interface CompareReposProps {
   language: 'en' | 'zh'
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 interface BenchmarkSuggestion {
   full_name: string
