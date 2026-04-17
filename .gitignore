@@ -51,3 +51,4 @@ docs/
 
 # Backend tests (kept out of repo)
 backend/test_*.py
+backend/tests/
