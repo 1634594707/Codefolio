@@ -31,12 +31,12 @@ const labels = {
     tabsRepos: 'Repositories',
     mineLabel: 'My repository',
     benchmarkLabel: 'Benchmark repository',
-    minePlaceholder: 'owner/repo',
-    benchmarkPlaceholder: 'owner/repo',
+    minePlaceholder: 'owner/repo…',
+    benchmarkPlaceholder: 'owner/repo…',
     addBenchmark: 'Add benchmark',
     removeBenchmark: 'Remove',
     compare: 'Generate benchmark',
-    comparing: 'Benchmarking...',
+    comparing: 'Benchmarking…',
     includeNarrative: 'Include narrative summary',
     empty: 'Start with one repository you want to improve, then add up to three benchmark repositories.',
     invalidMine: 'Use a valid GitHub repository like owner/repo.',
@@ -83,7 +83,7 @@ const labels = {
     staleWarning: 'This data is over 7 days old. Consider refreshing.',
     refresh: 'Refresh',
     suggestBenchmarks: 'Suggest Benchmarks',
-    suggesting: 'Finding suggestions...',
+    suggesting: 'Finding suggestions…',
     suggestError: 'Failed to fetch suggestions.',
     noSuggestions: 'No suggestions found.',
     addSuggestion: 'Add',
@@ -95,12 +95,12 @@ const labels = {
     tabsRepos: '仓库',
     mineLabel: '我的仓库',
     benchmarkLabel: '标杆仓库',
-    minePlaceholder: 'owner/repo',
-    benchmarkPlaceholder: 'owner/repo',
+    minePlaceholder: 'owner/repo…',
+    benchmarkPlaceholder: 'owner/repo…',
     addBenchmark: '添加标杆',
     removeBenchmark: '移除',
     compare: '生成对标',
-    comparing: '对标中...',
+    comparing: '对标中…',
     includeNarrative: '包含叙述总结',
     empty: '先输入一个你想提升的仓库，再添加最多 3 个标杆仓库。',
     invalidMine: '请输入有效的 GitHub 仓库，格式如 owner/repo。',
@@ -147,7 +147,7 @@ const labels = {
     staleWarning: '此数据已超过 7 天，建议刷新。',
     refresh: '刷新',
     suggestBenchmarks: '推荐标杆仓库',
-    suggesting: '正在查找推荐...',
+    suggesting: '正在查找推荐…',
     suggestError: '获取推荐失败。',
     noSuggestions: '未找到推荐仓库。',
     addSuggestion: '添加',
@@ -416,6 +416,9 @@ export function CompareRepos({ language }: CompareReposProps) {
               value={mineInput}
               onChange={(event) => setMineInput(event.target.value)}
               placeholder={text.minePlaceholder}
+              autoComplete="off"
+              name="mine-repo"
+              spellCheck={false}
             />
           </label>
 
@@ -429,6 +432,9 @@ export function CompareRepos({ language }: CompareReposProps) {
                     value={value}
                     onChange={(event) => updateBenchmarkField(index, event.target.value)}
                     placeholder={text.benchmarkPlaceholder}
+                    autoComplete="off"
+                    name={`benchmark-repo-${index}`}
+                    spellCheck={false}
                   />
                 </label>
                 {visibleBenchmarkInputs.length > 1 && (
@@ -441,8 +447,13 @@ export function CompareRepos({ language }: CompareReposProps) {
           </div>
 
           <div className="repo-benchmark-actions">
-            <label className="repo-benchmark-toggle">
-              <input type="checkbox" checked={includeNarrative} onChange={(event) => setIncludeNarrative(event.target.checked)} />
+            <label className="repo-benchmark-toggle" htmlFor="include-narrative">
+              <input
+                id="include-narrative"
+                type="checkbox"
+                checked={includeNarrative}
+                onChange={(event) => setIncludeNarrative(event.target.checked)}
+              />
               <span>{text.includeNarrative}</span>
             </label>
 
@@ -496,14 +507,14 @@ export function CompareRepos({ language }: CompareReposProps) {
 
         {!result && !loading && !error && <p className="compare-hint">{text.empty}</p>}
         {error && (
-          <div className="error-state">
+          <div className="error-state" role="alert">
             <p>{error}</p>
           </div>
         )}
       </section>
 
       {loading && (
-        <div className="loading-state">
+        <div className="loading-state" aria-live="polite">
           <p>{text.comparing}</p>
         </div>
       )}

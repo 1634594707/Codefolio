@@ -40,6 +40,9 @@ function makeGenerateResponse(username: string): GenerateResponse {
 }
 
 const usernameArb = fc.stringMatching(/^[a-zA-Z0-9-]{1,20}$/)
+const isoDateArb = fc
+  .integer({ min: -8_640_000_000_000_000, max: 8_640_000_000_000_000 })
+  .map((value) => new Date(value).toISOString())
 
 const workspaceSnapshotArb: fc.Arbitrary<WorkspaceSnapshot> = fc.record({
   version: fc.constant<1>(1),
@@ -61,7 +64,7 @@ const workspaceSnapshotArb: fc.Arbitrary<WorkspaceSnapshot> = fc.record({
       stars: fc.integer({ min: 0, max: 100000 }),
       forks: fc.integer({ min: 0, max: 100000 }),
       url: fc.webUrl(),
-      pushed_at: fc.option(fc.date().map((value) => value.toISOString()), { nil: undefined }),
+      pushed_at: fc.option(isoDateArb, { nil: undefined }),
       has_readme: fc.option(fc.boolean(), { nil: undefined }),
       has_license: fc.option(fc.boolean(), { nil: undefined }),
       analysisTitle: fc.string(),
@@ -89,7 +92,7 @@ const workspaceSnapshotArb: fc.Arbitrary<WorkspaceSnapshot> = fc.record({
         hypotheses: fc.constant([]),
         actions: fc.constant([]),
         narrative: fc.constant(null),
-        generated_at: fc.date().map((value) => value.toISOString()),
+        generated_at: isoDateArb,
         llm_calls: fc.integer({ min: 0, max: 10 }),
       }) as never,
       savedAt: fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER }),

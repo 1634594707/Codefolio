@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.3.1] - 2026-04-17
+
+### Added
+
+- UI guidelines regression coverage for page-level accessibility and HTML correctness checks
+- Preservation tests covering compare input submission, repository card click separation, overview history navigation, and loading-copy stability
+
+### Changed
+
+- Replaced loading and async copy ASCII ellipses with Unicode ellipses across Compare, CompareRepos, Repositories, Export, AIAnalysis, and Overview
+- Added missing `type`, `width` / `height`, `aria-label`, `aria-live`, `role="alert"`, and chart accessibility attributes across affected frontend pages
+- Restructured repository cards to avoid nested interactive elements and converted overview history row activation to semantic buttons
+- Updated affected unit and property tests to align with the new UI guidelines and stabilized property-based workspace/app-context test fixtures
+
 ## [v1.3.0] - 2026-04-15
 
 ### Added

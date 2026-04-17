@@ -66,7 +66,7 @@ const labels = {
 
     analyzeRepo: 'Analyze with AI',
 
-    analyzingRepo: 'Analyzing...',
+    analyzingRepo: 'Analyzing…',
 
     addToResume: 'Add to resume',
 
@@ -176,7 +176,7 @@ const labels = {
 
     analyzeRepo: 'AI 分析',
 
-    analyzingRepo: '分析中...',
+    analyzingRepo: '分析中…',
 
     addToResume: '加入简历',
 
@@ -780,7 +780,7 @@ export function Overview({ language }: OverviewProps) {
 
           {currentUser && (
 
-            <button className="history-action-btn" onClick={() => handleOpenRepos(currentUser)}>
+            <button type="button" className="history-action-btn" onClick={() => handleOpenRepos(currentUser)}>
 
               {text.candidateAction}
 
@@ -1000,14 +1000,14 @@ export function Overview({ language }: OverviewProps) {
 
               <>
 
-                <button className="history-action-btn" onClick={() => handleOpenRepos(currentUser)}>
+                <button type="button" className="history-action-btn" onClick={() => handleOpenRepos(currentUser)}>
 
                   {text.openRepos}
 
                 </button>
 
                 <button
-
+                  type="button"
                   className="history-action-btn added"
 
                   onClick={() => navigate(`/export?user=${encodeURIComponent(currentUser)}`)}
@@ -1126,7 +1126,7 @@ export function Overview({ language }: OverviewProps) {
 
           {history.length > 0 && (
 
-            <button className="clear-btn" onClick={clearHistory}>
+            <button type="button" className="clear-btn" onClick={clearHistory}>
 
               {text.clearHistory}
 
@@ -1166,17 +1166,12 @@ export function Overview({ language }: OverviewProps) {
 
               <div key={item.id} className="history-item-with-actions">
 
-                <div
-
+                <button
+                  type="button"
                   className="history-item-main"
-
                   onClick={() => handleOpenAnalysis(item.username)}
-
-                  style={{ cursor: 'pointer' }}
-
                 >
-
-                  <img src={item.avatarUrl} alt={item.username} className="history-avatar" />
+                  <img src={item.avatarUrl} alt={item.username} className="history-avatar" width={48} height={48} />
 
                   <div className="history-info">
 
@@ -1196,14 +1191,14 @@ export function Overview({ language }: OverviewProps) {
 
                   </div>
 
-                </div>
+                </button>
 
 
 
                 <div className="history-actions">
 
                   <button
-
+                    type="button"
                     className="history-action-btn"
 
                     onClick={() => handleOpenRepos(item.username)}
@@ -1212,7 +1207,7 @@ export function Overview({ language }: OverviewProps) {
 
                   >
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
 
                       <path d="M4 20V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v15" />
 
@@ -1227,7 +1222,7 @@ export function Overview({ language }: OverviewProps) {
 
 
                   <button
-
+                    type="button"
                     className="history-action-btn"
 
                     onClick={() => handleOpenAnalysis(item.username)}
@@ -1236,7 +1231,7 @@ export function Overview({ language }: OverviewProps) {
 
                   >
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
 
                       <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
 
@@ -1251,7 +1246,7 @@ export function Overview({ language }: OverviewProps) {
 
 
                   <button
-
+                    type="button"
                     className={`history-action-btn ${addedUsers.has(item.username) ? 'added' : ''}`}
 
                     onClick={() => handleAddToCompare(item.username)}
@@ -1262,7 +1257,7 @@ export function Overview({ language }: OverviewProps) {
 
                   >
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
 
                       <path d="M12 5v14M5 12h14" />
 
@@ -1275,7 +1270,7 @@ export function Overview({ language }: OverviewProps) {
 
 
                   <button
-
+                    type="button"
                     className="history-action-btn"
 
                     onClick={() => void refreshUserCache(item.username)}
@@ -1284,7 +1279,7 @@ export function Overview({ language }: OverviewProps) {
 
                   >
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
 
                       <path d="M21 12a9 9 0 1 1-2.64-6.36" />
 
@@ -1299,7 +1294,7 @@ export function Overview({ language }: OverviewProps) {
 
 
                   <button
-
+                    type="button"
                     className="history-action-btn delete-btn"
 
                     onClick={() => deleteHistoryItem(item)}
@@ -1308,7 +1303,7 @@ export function Overview({ language }: OverviewProps) {
 
                   >
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
 
                       <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
 

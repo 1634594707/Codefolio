@@ -27,14 +27,14 @@ const labels = {
     markdownDesc: 'Copy resume in Markdown format',
     copyMarkdown: 'Copy Markdown',
     markdownCopied: 'Markdown Copied!',
-    loading: 'Loading...',
+    loading: 'Loading…',
     error: 'Failed to load data',
     noUser: 'Enter a GitHub username to export',
     preview: 'Preview',
     benchmarkTitle: 'Repository Benchmark',
     benchmarkDesc: 'Append a benchmark report to your export',
     includeBenchmark: 'Include benchmark report',
-    benchmarkLoading: 'Loading benchmark...',
+    benchmarkLoading: 'Loading benchmark…',
     benchmarkError: 'Failed to load benchmark report',
     benchmarkNone: 'No benchmark available. Run a comparison on the Repositories tab first.',
   },
@@ -51,14 +51,14 @@ const labels = {
     markdownDesc: '复制 Markdown 格式简历',
     copyMarkdown: '复制 Markdown',
     markdownCopied: 'Markdown 已复制!',
-    loading: '加载中...',
+    loading: '加载中…',
     error: '加载数据失败',
     noUser: '输入 GitHub 用户名以导出',
     preview: '预览',
     benchmarkTitle: '仓库对标',
     benchmarkDesc: '将对标报告附加到导出内容',
     includeBenchmark: '包含对标报告',
-    benchmarkLoading: '加载对标报告中...',
+    benchmarkLoading: '加载对标报告中…',
     benchmarkError: '加载对标报告失败',
     benchmarkNone: '暂无对标报告。请先在仓库页面运行对标分析。',
   },
@@ -397,7 +397,7 @@ export function Export({ language }: ExportProps) {
       <div className="export-grid">
         <div className="export-card">
           <div className="export-icon pdf-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" />
@@ -407,13 +407,14 @@ export function Export({ language }: ExportProps) {
           </div>
           <h3 className="export-title">{text.pdfTitle}</h3>
           <p className="export-desc">{text.pdfDesc}</p>
-          <button className="export-btn primary" onClick={exportPdf} disabled={exportingPdf}>
+          <button type="button" className="export-btn primary" onClick={exportPdf} disabled={exportingPdf}>
             {exportingPdf ? text.loading : text.downloadPdf}
           </button>
           {pdfError && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
               <p style={{ color: 'var(--color-error, #ef4444)', marginBottom: '0.25rem' }}>{pdfError}</p>
               <button
+                type="button"
                 className="export-btn secondary"
                 style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
                 onClick={() => { setPdfError(''); void exportPdf() }}
@@ -426,7 +427,7 @@ export function Export({ language }: ExportProps) {
 
         <div className="export-card">
           <div className="export-icon card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
@@ -434,14 +435,14 @@ export function Export({ language }: ExportProps) {
           </div>
           <h3 className="export-title">{text.cardTitle}</h3>
           <p className="export-desc">{text.cardDesc}</p>
-          <button className="export-btn primary" onClick={downloadCard}>
+          <button type="button" className="export-btn primary" onClick={downloadCard}>
             {exportingCard ? text.loading : text.downloadCard}
           </button>
         </div>
 
         <div className="export-card">
           <div className="export-icon markdown-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" />
@@ -451,7 +452,7 @@ export function Export({ language }: ExportProps) {
           </div>
           <h3 className="export-title">{text.markdownTitle}</h3>
           <p className="export-desc">{text.markdownDesc}</p>
-          <button className="export-btn secondary" onClick={copyMarkdown}>
+          <button type="button" className="export-btn secondary" onClick={copyMarkdown}>
             {markdownCopied ? text.markdownCopied : text.copyMarkdown}
           </button>
         </div>
@@ -459,7 +460,7 @@ export function Export({ language }: ExportProps) {
 
       <div className="export-card" style={{ marginBottom: '1.5rem' }}>
         <div className="export-icon markdown-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <line x1="3" y1="9" x2="21" y2="9" />
             <line x1="9" y1="21" x2="9" y2="9" />
@@ -476,7 +477,7 @@ export function Export({ language }: ExportProps) {
           <span>{text.includeBenchmark}</span>
         </label>
         {includeBenchmark && (
-          <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+          <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }} aria-live="polite">
             {benchmarkLoading && <p>{text.benchmarkLoading}</p>}
             {benchmarkError && <p style={{ color: 'var(--color-error, #ef4444)' }}>{benchmarkError}</p>}
             {!benchmarkLoading && !benchmarkError && !benchmarkResult && (
@@ -513,6 +514,8 @@ export function Export({ language }: ExportProps) {
                   src={activeOutput.card_data.avatar_url}
                   alt={activeOutput.card_data.username}
                   className="social-card-avatar"
+                  width={64}
+                  height={64}
                 />
                 <div className="social-card-info">
                   <h3>@{activeOutput.card_data.username}</h3>

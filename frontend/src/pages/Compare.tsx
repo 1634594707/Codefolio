@@ -67,6 +67,7 @@ const labels = {
     tabsUsers: 'Developers',
     tabsRepos: 'Repositories',
     addUser: 'Add User',
+    addUserPlaceholder: 'Add User…',
     remove: 'Remove',
     comparisonInsights: 'Comparison Insights',
     overallLeader: 'Overall Leader',
@@ -91,7 +92,7 @@ const labels = {
     following: 'Following',
     repos: 'Repositories',
     stars: 'Total Stars',
-    loading: 'Loading...',
+    loading: 'Loading…',
     error: 'Failed to load',
     empty: 'Add GitHub usernames to compare',
     invalidInput: 'Use GitHub usernames or profile links only.',
@@ -105,6 +106,7 @@ const labels = {
     tabsUsers: '开发者',
     tabsRepos: '仓库对标',
     addUser: '添加用户',
+    addUserPlaceholder: '添加用户…',
     remove: '移除',
     comparisonInsights: '对比结论',
     overallLeader: '当前领先者',
@@ -129,7 +131,7 @@ const labels = {
     following: '正在关注',
     repos: '仓库数',
     stars: '总星标',
-    loading: '加载中...',
+    loading: '加载中…',
     error: '加载失败',
     empty: '添加 GitHub 用户名进行对比',
     invalidInput: '请输入 GitHub 用户名或主页链接。',
@@ -478,11 +480,14 @@ export function Compare({ language }: CompareProps) {
               setInputValue(event.target.value)
               if (inputError) setInputError('')
             }}
-            placeholder={text.addUser}
+            placeholder={text.addUserPlaceholder}
             className="compare-input"
             onKeyDown={(event) => event.key === 'Enter' && addUser()}
+            autoComplete="off"
+            name="username"
+            spellCheck={false}
           />
-          <button className="compare-add-btn" onClick={addUser} disabled={usernames.length >= 3}>
+          <button type="button" className="compare-add-btn" onClick={addUser} disabled={usernames.length >= 3}>
             {text.addUser}
           </button>
         </div>
@@ -497,13 +502,13 @@ export function Compare({ language }: CompareProps) {
       )}
 
       {error && (
-        <div className="error-state">
+        <div className="error-state" role="alert">
           <p>{error}</p>
         </div>
       )}
 
       {!loading && failedUsers.length > 0 && (
-        <div className="error-state">
+        <div className="error-state" role="alert">
           <p>{`${text.partialFailure}: ${failedUsers.map((user) => `@${user}`).join(', ')}`}</p>
         </div>
       )}
@@ -561,14 +566,14 @@ export function Compare({ language }: CompareProps) {
             {users.map((user, index) => (
               <div key={user.username} className="compare-user-card" style={{ borderColor: colors[index] }}>
                 <div className="compare-user-header">
-                  <img src={user.avatar_url} alt={user.username} className="compare-avatar" />
+                  <img src={user.avatar_url} alt={user.username} className="compare-avatar" width={56} height={56} />
                   <div className="compare-user-info">
                     <h3>@{user.username}</h3>
                     <span className="compare-gitscore" style={{ color: colors[index] }}>
                       {user.gitscore.toFixed(0)}
                     </span>
                   </div>
-                  <button className="compare-remove-btn" onClick={() => removeUser(user.username)}>
+                  <button type="button" className="compare-remove-btn" onClick={() => removeUser(user.username)}>
                     {text.remove}
                   </button>
                 </div>

@@ -139,7 +139,7 @@ const labels = {
 
     },
 
-    loading: 'Analyzing...',
+    loading: 'Analyzing…',
 
     error: 'Failed to load analysis',
 
@@ -181,7 +181,7 @@ const labels = {
 
     },
 
-    loading: '分析中...',
+    loading: '分析中…',
 
     error: '加载分析失败',
 
@@ -477,7 +477,7 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
           <div className="user-header">
 
-            <img src={userData.avatar_url} alt={userData.username} className="header-avatar" />
+            <img src={userData.avatar_url} alt={userData.username} className="header-avatar" width={40} height={40} />
 
             <span className="header-username">@{userData.username}</span>
 
@@ -518,39 +518,24 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
           <h3 className="card-title">{text.score}</h3>
 
           <div className="radar-wrapper">
-
-            <ResponsiveContainer width="100%" height="100%">
-
-              <RadarChart data={radarData}>
-
-                <PolarGrid stroke="var(--color-outline-variant)" />
-
-                <PolarAngleAxis
-
-                  dataKey="subject"
-
-                  tick={{ fill: 'var(--color-on-surface-variant)', fontSize: 12 }}
-
-                />
-
-                <Radar
-
-                  name="GitScore"
-
-                  dataKey="value"
-
-                  stroke="var(--color-primary)"
-
-                  fill="var(--color-primary)"
-
-                  fillOpacity={0.3}
-
-                />
-
-              </RadarChart>
-
-            </ResponsiveContainer>
-
+            <div role="img" aria-label={language === 'zh' ? 'GitScore 雷达图' : 'GitScore radar chart'}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData}>
+                  <PolarGrid stroke="var(--color-outline-variant)" />
+                  <PolarAngleAxis
+                    dataKey="subject"
+                    tick={{ fill: 'var(--color-on-surface-variant)', fontSize: 12 }}
+                  />
+                  <Radar
+                    name="GitScore"
+                    dataKey="value"
+                    stroke="var(--color-primary)"
+                    fill="var(--color-primary)"
+                    fillOpacity={0.3}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
         </div>

@@ -52,11 +52,12 @@ const labels = {
   en: {
     title: 'Repositories',
     searchPlaceholder: 'Search repositories...',
+    sortBy: 'Sort by',
     stars: 'Stars',
     forks: 'Forks',
     updated: 'Updated',
     noDescription: 'No description provided.',
-    loading: 'Loading...',
+    loading: 'Loading…',
     error: 'Failed to load repositories',
     noUser: 'Enter a GitHub username to view repositories',
     visibleRepos: 'Visible repositories',
@@ -70,7 +71,7 @@ const labels = {
     emptyResults: 'No repositories matched this view.',
     analyzeRepo: 'Analyze for resume',
     benchmarkRepo: 'Benchmark repo',
-    analyzingRepo: 'Analyzing repository...',
+    analyzingRepo: 'Analyzing repository…',
     addToResume: 'Add to resume',
     addedToResume: 'Added',
     selectedProjects: 'Selected projects',
@@ -80,11 +81,12 @@ const labels = {
   zh: {
     title: '仓库',
     searchPlaceholder: '搜索仓库...',
+    sortBy: '排序方式',
     stars: '星标',
     forks: 'Forks',
     updated: '最近更新',
     noDescription: '暂无描述',
-    loading: '加载中...',
+    loading: '加载中…',
     error: '加载仓库失败',
     noUser: '输入 GitHub 用户名查看仓库',
     visibleRepos: '当前显示仓库',
@@ -97,7 +99,7 @@ const labels = {
     lastPush: '最近推送',
     emptyResults: '当前视图下没有匹配仓库。',
     analyzeRepo: '分析到简历',
-    analyzingRepo: '正在分析仓库...',
+    analyzingRepo: '正在分析仓库…',
     addToResume: '加入简历',
     addedToResume: '已加入',
     selectedProjects: '已选项目',
@@ -369,7 +371,7 @@ export function Repositories({ language }: RepositoriesProps) {
         </div>
         {userData && (
           <div className="user-header">
-            <img src={userData.avatar_url} alt={userData.username} className="header-avatar" />
+            <img src={userData.avatar_url} alt={userData.username} className="header-avatar" width={40} height={40} />
             <span className="header-username">@{userData.username}</span>
           </div>
         )}
@@ -391,6 +393,7 @@ export function Repositories({ language }: RepositoriesProps) {
         <input
           type="text"
           placeholder={text.searchPlaceholder}
+          aria-label={text.searchPlaceholder}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
@@ -399,6 +402,7 @@ export function Repositories({ language }: RepositoriesProps) {
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortMode)}
           className="sort-select"
+          aria-label={text.sortBy}
         >
           <option value="stars">{text.stars}</option>
           <option value="updated">{text.updated}</option>
@@ -419,9 +423,11 @@ export function Repositories({ language }: RepositoriesProps) {
             const isSelected = selectedProjects.some((item) => item.repoName === repo.name)
 
             return (
-              <a key={repo.url} href={repo.url} target="_blank" rel="noreferrer" className="repo-card">
+              <div key={repo.url} className="repo-card">
                 <div className="repo-card-header">
-                  <h3 className="repo-card-name">{repo.name}</h3>
+                  <a href={repo.url} target="_blank" rel="noreferrer" className="repo-card-name-link">
+                    <h3 className="repo-card-name">{repo.name}</h3>
+                  </a>
                   {repo.language && (
                     <span className="repo-card-lang" style={{ color: langColors[repo.language] || '#8b949e' }}>
                       <span className="lang-dot" style={{ backgroundColor: langColors[repo.language] || '#8b949e' }} />
@@ -440,13 +446,13 @@ export function Repositories({ language }: RepositoriesProps) {
 
                 <div className="repo-card-stats">
                   <span className="repo-stat">
-                    <svg className="stat-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                     </svg>
                     {formatCompactNumber(repo.stars)}
                   </span>
                   <span className="repo-stat">
-                    <svg className="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <circle cx="12" cy="18" r="3" />
                       <circle cx="6" cy="6" r="3" />
                       <circle cx="18" cy="6" r="3" />
@@ -467,8 +473,7 @@ export function Repositories({ language }: RepositoriesProps) {
                   <button
                     type="button"
                     className="repo-action-btn"
-                    onClick={(e) => {
-                      e.preventDefault()
+                    onClick={() => {
                       void analyzeRepo(repo)
                     }}
                   >
@@ -477,8 +482,7 @@ export function Repositories({ language }: RepositoriesProps) {
                   <button
                     type="button"
                     className="repo-action-btn"
-                    onClick={(e) => {
-                      e.preventDefault()
+                    onClick={() => {
                       navigate(`/compare/repos?mine=${encodeURIComponent(`${username}/${repo.name}`)}`)
                     }}
                   >
@@ -487,8 +491,7 @@ export function Repositories({ language }: RepositoriesProps) {
                   <button
                     type="button"
                     className={`repo-action-btn ${isSelected ? 'active' : ''}`}
-                    onClick={(e) => {
-                      e.preventDefault()
+                    onClick={() => {
                       toggleResumeProject(project)
                     }}
                   >
@@ -526,7 +529,7 @@ export function Repositories({ language }: RepositoriesProps) {
                     )}
                   </div>
                 )}
-              </a>
+              </div>
             )
           })}
         </div>

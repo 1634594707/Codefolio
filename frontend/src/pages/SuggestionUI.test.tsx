@@ -8,6 +8,8 @@ import { MemoryRouter } from 'react-router-dom'
 import axios from 'axios'
 import { CompareRepos } from './CompareRepos'
 
+const REPO_PLACEHOLDER = 'owner/repo…'
+
 vi.mock('../context', () => ({
   useApp: () => ({
     saveBenchmarkWorkspaceEntry: vi.fn(),
@@ -76,7 +78,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -97,7 +99,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -117,7 +119,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -132,7 +134,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       mockedAxios.get.mockResolvedValueOnce({ data: { suggestions: [] } })
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -152,7 +154,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       mockedAxios.isAxiosError = vi.fn().mockReturnValue(true) as unknown as typeof axios.isAxiosError
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -173,7 +175,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -187,7 +189,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
 
       // The suggestion panel should close and the benchmark input should be populated
       await waitFor(() => {
-        const inputs = screen.getAllByPlaceholderText('owner/repo')
+        const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
         const values = inputs.map((input) => (input as HTMLInputElement).value)
         expect(values).toContain('org/repo-a')
       })
@@ -203,7 +205,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
 
@@ -229,15 +231,15 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[0], { target: { value: 'owner/myrepo' } })
       // Fill 3 benchmark slots
       fireEvent.change(inputs[1], { target: { value: 'org/bench1' } })
       fireEvent.click(screen.getByRole('button', { name: 'Add benchmark' }))
-      const inputs2 = screen.getAllByPlaceholderText('owner/repo')
+      const inputs2 = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs2[2], { target: { value: 'org/bench2' } })
       fireEvent.click(screen.getByRole('button', { name: 'Add benchmark' }))
-      const inputs3 = screen.getAllByPlaceholderText('owner/repo')
+      const inputs3 = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs3[3], { target: { value: 'org/bench3' } })
 
       fireEvent.click(screen.getByRole('button', { name: 'Suggest Benchmarks' }))
@@ -260,7 +262,7 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       })
 
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[0], { target: { value: 'owner/myrepo' } })
       fireEvent.change(inputs[1], { target: { value: 'org/bench1' } })
 
@@ -281,12 +283,12 @@ describe('Suggestion UI (Requirements 7.1, 7.6)', () => {
       mockedAxios.get.mockReturnValueOnce(new Promise(() => {}))
 
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: /suggest/i }))
 
       // Button text changes to loading state
-      expect(screen.getByRole('button', { name: 'Finding suggestions...' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Finding suggestions…' })).toBeInTheDocument()
     })
   })
 })

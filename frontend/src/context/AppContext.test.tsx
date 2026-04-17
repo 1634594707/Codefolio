@@ -104,6 +104,7 @@ describe('Property 1: request deduplication consistency', () => {
         fc.integer({ min: 2, max: 6 }),
         async (username, language, callCount) => {
           vi.mocked(axios.post).mockReset()
+          localStorage.clear()
           const response = makeGenerateResponse(username, language)
           vi.mocked(axios.post).mockResolvedValueOnce({ data: response } as never)
 
@@ -142,6 +143,7 @@ describe('Property 2: requests can retry after failure', () => {
         fc.constantFrom<'en' | 'zh'>('en', 'zh'),
         async (username, language) => {
           vi.mocked(axios.post).mockReset()
+          localStorage.clear()
           vi.mocked(axios.post)
             .mockRejectedValueOnce(new Error('boom'))
             .mockResolvedValueOnce({ data: makeGenerateResponse(username, language) } as never)

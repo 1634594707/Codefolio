@@ -7,6 +7,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { CompareRepos } from './CompareRepos'
 
+const REPO_PLACEHOLDER = 'owner/repo…'
+
 vi.mock('../context', () => ({
   useApp: () => ({
     saveBenchmarkWorkspaceEntry: vi.fn(),
@@ -47,7 +49,7 @@ describe('CompareRepos', () => {
 
     it('renders the mine repo input', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       expect(inputs.length).toBeGreaterThanOrEqual(1)
     })
 
@@ -77,7 +79,7 @@ describe('CompareRepos', () => {
 
     it('shows error when mine repo has invalid format', () => {
       renderCompareRepos()
-      const mineInput = screen.getAllByPlaceholderText('owner/repo')[0]
+      const mineInput = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)[0]
       fireEvent.change(mineInput, { target: { value: 'not-valid-format' } })
       fireEvent.click(screen.getByRole('button', { name: 'Generate benchmark' }))
       expect(screen.getByText('Use a valid GitHub repository like owner/repo.')).toBeInTheDocument()
@@ -85,7 +87,7 @@ describe('CompareRepos', () => {
 
     it('shows error when mine repo is valid but no benchmark repos added', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[0], { target: { value: 'owner/myrepo' } })
       // Leave benchmark input empty
       fireEvent.click(screen.getByRole('button', { name: 'Generate benchmark' }))
@@ -94,7 +96,7 @@ describe('CompareRepos', () => {
 
     it('shows error when benchmark repo is same as mine repo', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[0], { target: { value: 'owner/myrepo' } })
       fireEvent.change(inputs[1], { target: { value: 'owner/myrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Generate benchmark' }))
@@ -103,7 +105,7 @@ describe('CompareRepos', () => {
 
     it('accepts valid owner/repo format', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[0], { target: { value: 'owner/myrepo' } })
       fireEvent.change(inputs[1], { target: { value: 'other/benchrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Generate benchmark' }))
@@ -116,7 +118,7 @@ describe('CompareRepos', () => {
   describe('add/remove benchmark functionality (Requirement 2.1)', () => {
     it('starts with one benchmark input field', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       // 1 mine + 1 benchmark = 2 inputs
       expect(inputs.length).toBe(2)
     })
@@ -128,22 +130,22 @@ describe('CompareRepos', () => {
 
     it('adds a second benchmark field when add button is clicked with non-empty first', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       // Fill in the first benchmark so a new one can be added
       fireEvent.change(inputs[1], { target: { value: 'owner/bench1' } })
       fireEvent.click(screen.getByRole('button', { name: 'Add benchmark' }))
-      const updatedInputs = screen.getAllByPlaceholderText('owner/repo')
+      const updatedInputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       expect(updatedInputs.length).toBe(3)
     })
 
     it('disables add benchmark button when 3 benchmarks are present', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       // Fill first benchmark
       fireEvent.change(inputs[1], { target: { value: 'owner/bench1' } })
       fireEvent.click(screen.getByRole('button', { name: 'Add benchmark' }))
       // Fill second benchmark
-      const inputs2 = screen.getAllByPlaceholderText('owner/repo')
+      const inputs2 = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs2[2], { target: { value: 'owner/bench2' } })
       fireEvent.click(screen.getByRole('button', { name: 'Add benchmark' }))
       // Now at 3 benchmarks, button should be disabled
@@ -152,14 +154,14 @@ describe('CompareRepos', () => {
 
     it('removes a benchmark field when remove button is clicked', () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[1], { target: { value: 'owner/bench1' } })
       fireEvent.click(screen.getByRole('button', { name: 'Add benchmark' }))
       // Now 2 benchmark fields, remove button should appear
       const removeButtons = screen.getAllByRole('button', { name: 'Remove' })
       expect(removeButtons.length).toBeGreaterThan(0)
       fireEvent.click(removeButtons[0])
-      const updatedInputs = screen.getAllByPlaceholderText('owner/repo')
+      const updatedInputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       expect(updatedInputs.length).toBe(2)
     })
   })
@@ -177,7 +179,7 @@ describe('CompareRepos', () => {
   describe('error handling display (Requirement 3.4)', () => {
     it('displays error message in error state element', async () => {
       renderCompareRepos()
-      const inputs = screen.getAllByPlaceholderText('owner/repo')
+      const inputs = screen.getAllByPlaceholderText(REPO_PLACEHOLDER)
       fireEvent.change(inputs[0], { target: { value: 'owner/myrepo' } })
       fireEvent.change(inputs[1], { target: { value: 'other/benchrepo' } })
       fireEvent.click(screen.getByRole('button', { name: 'Generate benchmark' }))
