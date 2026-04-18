@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Codefolio API",
     description="GitHub profile analyzer API",
-    version="1.3.2",
+    version="1.3.3",
     lifespan=lifespan,
 )
 

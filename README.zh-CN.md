@@ -99,7 +99,7 @@ cp .env.production.example .env.production
 3. 修改以下内容：
 
 - `backend/.env`：填写 `GITHUB_TOKEN`、`AI_API_KEY`、`AI_MODEL`
-- `.env.production`：填写你的域名、对外端口
+- `.env.production`：填写你的域名和绑定方式
 
 4. 启动生产环境：
 
@@ -114,6 +114,7 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 - `backend-data` 卷负责持久化 SQLite 数据
 - `redis-data` 卷负责持久化 Redis 数据
 - Compose 会等待 Redis 和后端健康后再拉起前端
+- 生产环境建议仅绑定 `127.0.0.1:8080`，再由 Nginx / Caddy 对外提供 HTTPS
 
 ### PostgreSQL 升级路线
 

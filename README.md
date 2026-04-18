@@ -99,7 +99,7 @@ cp .env.production.example .env.production
 3. Update:
 
 - `backend/.env` with `GITHUB_TOKEN`, `AI_API_KEY`, and model settings
-- `.env.production` with your real domain and public port
+- `.env.production` with your real domain and bind settings
 
 4. Start production services:
 
@@ -114,6 +114,7 @@ Production notes:
 - Backend data persists in the `backend-data` volume.
 - Redis data persists in the `redis-data` volume.
 - Compose health checks wait for Redis and the backend before exposing the frontend.
+- Recommended production binding is `127.0.0.1:8080`, with Nginx or Caddy terminating HTTPS in front.
 
 ### PostgreSQL upgrade path
 
@@ -195,13 +196,13 @@ AI_API_KEY=your_ai_api_key
 AI_API_BASE_URL=https://api.deepseek.com/v1
 AI_MODEL=deepseek-chat
 AI_REQUEST_TIMEOUT=60.0
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://redis:6379
 REDIS_DB=0
 DATABASE_PATH=/app/data/codefolio.db
 DATABASE_URL=postgresql://codefolio:change-me@postgres:5432/codefolio
 POSTGRES_POOL_MIN_SIZE=1
 POSTGRES_POOL_MAX_SIZE=10
-CORS_ORIGINS=http://localhost:8080,https://your-domain.com
+CORS_ORIGINS=https://your-domain.com
 GITHUB_CACHE_TTL=86400
 AI_CACHE_TTL=604800
 REPOSITORY_METADATA_TTL=3600

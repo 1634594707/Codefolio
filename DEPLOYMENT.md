@@ -47,11 +47,18 @@ POSTGRES_POOL_MAX_SIZE=10
 Create `.env.production` from the template:
 
 ```env
-PUBLIC_HTTP_PORT=80
+PUBLIC_BIND_IP=127.0.0.1
+PUBLIC_HTTP_PORT=8080
 CORS_ORIGINS=https://your-domain.com
 ```
 
 If you have multiple domains, separate them with commas.
+
+Recommended production pattern:
+
+- Keep Docker publishing on `127.0.0.1:8080`
+- Put Nginx or Caddy in front for public HTTPS
+- Only change `PUBLIC_BIND_IP=0.0.0.0` if you intentionally want Docker to expose the frontend directly
 
 ## 4. Start Production
 

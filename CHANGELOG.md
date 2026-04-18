@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.3.3] - 2026-04-18
+
+### Added
+
+- Restored a safe `backend/.env.example` template with production-ready placeholders for GitHub, AI, OAuth, Redis, and database settings
+- Added a clearer `.env.production.example` flow for Docker production deployments using localhost binding behind an HTTPS reverse proxy
+
+### Changed
+
+- Production Docker Compose now binds the frontend to `127.0.0.1:8080` by default instead of exposing port 80 directly
+- Deployment documentation now standardizes the recommended production topology: Docker on localhost, Nginx or Caddy in front, and explicit `PUBLIC_BIND_IP` control when direct exposure is intentional
+- Backend and deployment docs now use container-aware defaults such as `REDIS_URL=redis://redis:6379` and domain-scoped `CORS_ORIGINS`
+
 ## [v1.3.2] - 2026-04-18
 
 ### Added
