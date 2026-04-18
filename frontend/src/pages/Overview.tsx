@@ -944,6 +944,68 @@ export function Overview({ language }: OverviewProps) {
 
                           )}
 
+                          {payload?.analysis?.strengths && payload.analysis.strengths.length > 0 && (
+
+                            <>
+
+                              <span className="topbar-search-suggestions-label">{language === 'zh' ? '当前优势' : 'What looks strong'}</span>
+
+                              <ul className="repo-analysis-list">
+
+                                {payload.analysis.strengths.map((item) => (
+
+                                  <li key={item}>{item}</li>
+
+                                ))}
+
+                              </ul>
+
+                            </>
+
+                          )}
+
+                          {payload?.analysis?.showcase_fit && (
+
+                            <>
+
+                              <span className="topbar-search-suggestions-label">{language === 'zh' ? '展示建议' : 'Showcase fit'}</span>
+
+                              <p>
+
+                                {payload.analysis.showcase_fit === 'resume_ready'
+                                  ? (language === 'zh' ? '适合直接放简历' : 'Ready for resume')
+                                  : payload.analysis.showcase_fit === 'portfolio_ready'
+                                    ? (language === 'zh' ? '更适合作品集展示' : 'Better for portfolio')
+                                    : (language === 'zh' ? '建议补强后再展示' : 'Needs hardening first')}
+                                {' · '}
+                                {language === 'zh' ? '置信度' : 'Confidence'}: {payload.analysis.confidence || 'medium'}
+
+                              </p>
+
+                            </>
+
+                          )}
+
+                          {payload?.analysis?.resume_bullets && payload.analysis.resume_bullets.length > 0 && (
+
+                            <>
+
+                              <span className="topbar-search-suggestions-label">{language === 'zh' ? '可直接改写到简历' : 'Resume-ready bullets'}</span>
+
+                              <ul className="repo-analysis-list">
+
+                                {payload.analysis.resume_bullets.map((item) => (
+
+                                  <li key={item}>{item}</li>
+
+                                ))}
+
+                              </ul>
+
+                            </>
+
+                          )}
+
                         </>
 
                       )

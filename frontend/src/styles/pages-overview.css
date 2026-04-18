@@ -810,6 +810,10 @@
   line-height: 1.5;
 }
 
+.repo-analysis-section {
+  margin-top: 12px;
+}
+
 .selected-projects-panel {
   margin-top: 28px;
   padding: 24px;

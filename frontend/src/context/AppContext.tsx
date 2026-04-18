@@ -42,6 +42,13 @@ export type ResumeProject = {
   analysisSummary: string
   highlights: string[]
   keywords: string[]
+  evidence?: string[]
+  strengths?: string[]
+  risks?: string[]
+  resumeBullets?: string[]
+  nextSteps?: string[]
+  showcaseFit?: string
+  confidence?: string
 }
 
 export type BenchmarkWorkspaceEntry = {

@@ -21,6 +21,12 @@ export type RepositoryAnalysisPayload = {
     highlights: string[]
     keywords: string[]
     evidence?: string[]
+    strengths?: string[]
+    risks?: string[]
+    resume_bullets?: string[]
+    next_steps?: string[]
+    showcase_fit?: string
+    confidence?: string
   }
 }
 
@@ -102,5 +108,12 @@ export function buildResumeProjectFromAnalysis(
     analysisSummary: payload.analysis.summary,
     highlights: payload.analysis.highlights,
     keywords: payload.analysis.keywords,
+    evidence: payload.analysis.evidence,
+    strengths: payload.analysis.strengths,
+    risks: payload.analysis.risks,
+    resumeBullets: payload.analysis.resume_bullets,
+    nextSteps: payload.analysis.next_steps,
+    showcaseFit: payload.analysis.showcase_fit,
+    confidence: payload.analysis.confidence,
   }
 }

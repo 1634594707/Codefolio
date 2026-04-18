@@ -43,9 +43,22 @@ class UserData:
     languages: Dict[str, int]  # language -> bytes of code
 
 @dataclass
+class GitScoreDimensionExplanation:
+    label: str
+    score: float
+    max_score: float
+    status: str
+    summary: str
+    evidence: List[str] = field(default_factory=list)
+    next_steps: List[str] = field(default_factory=list)
+    low_data: bool = False
+    confidence: str = "high"  # "high", "medium", "low"
+
+@dataclass
 class GitScore:
     total: float  # 0-100
     dimensions: Dict[str, float]  # impact, contribution, community, tech_breadth, documentation
+    explanations: Dict[str, GitScoreDimensionExplanation] = field(default_factory=dict)
 
 @dataclass
 class AIInsights:
@@ -72,6 +85,12 @@ class RepositoryAIAnalysis:
     highlights: List[str]
     keywords: List[str] = field(default_factory=list)
     evidence: List[str] = field(default_factory=list)
+    strengths: List[str] = field(default_factory=list)
+    risks: List[str] = field(default_factory=list)
+    resume_bullets: List[str] = field(default_factory=list)
+    next_steps: List[str] = field(default_factory=list)
+    showcase_fit: str = ""
+    confidence: str = "medium"
 
 @dataclass
 class GenerateRequest:

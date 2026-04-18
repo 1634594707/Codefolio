@@ -265,7 +265,7 @@ export function Export({ language }: ExportProps) {
       ? `\n\n## ${language === 'zh' ? '精选项目' : 'Selected Projects'}\n\n${selectedProjects
           .map(
             (project) =>
-              `### ${project.repoName}\n- ${project.analysisSummary}\n- ${project.highlights.join('\n- ')}\n- ${language === 'zh' ? '项目地址' : 'Project URL'}: ${project.url}`,
+              `### ${project.repoName}\n- ${project.analysisSummary}\n- ${(project.resumeBullets?.length ? project.resumeBullets : project.highlights).join('\n- ')}\n- ${language === 'zh' ? '项目地址' : 'Project URL'}: ${project.url}`,
           )
           .join('\n\n')}`
       : ''
@@ -274,6 +274,7 @@ export function Export({ language }: ExportProps) {
     includeBenchmark && benchmarkResult
       ? `\n\n---\n\n${generateBenchmarkMarkdown(benchmarkResult, language)}`
       : ''
+  const exportExtraMarkdown = `${selectedProjectsMarkdown}${benchmarkMarkdown}` || undefined
 
   const resumeMarkdown = `${activeOutput?.resume_markdown ?? ''}${selectedProjectsMarkdown}${benchmarkMarkdown}`
   const resumeHtml = markdownToHtml(resumeMarkdown)
@@ -294,7 +295,8 @@ export function Export({ language }: ExportProps) {
         {
           username,
           language: contentLanguage,
-          extra_markdown: selectedProjectsMarkdown || undefined,
+          resume_markdown: activeOutput?.resume_markdown,
+          extra_markdown: exportExtraMarkdown,
         },
         { responseType: 'blob' },
       )

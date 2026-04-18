@@ -254,6 +254,10 @@ async def suggest_benchmarks(
                     "reason_code": s.reason_code,
                     "reason_params": s.reason_params,
                     "stars": s.stars,
+                    "reason_title": s.reason_title,
+                    "reason_summary": s.reason_summary,
+                    "learn_from": s.learn_from,
+                    "badges": s.badges,
                 }
                 for s in suggestions
             ],

@@ -168,3 +168,7 @@ class BenchmarkSuggestion:
     reason_code: str
     reason_params: Dict[str, Any]
     stars: int
+    reason_title: str = ""
+    reason_summary: str = ""
+    learn_from: str = ""
+    badges: List[str] = field(default_factory=list)

@@ -8,6 +8,18 @@ export type AIInsights = {
   tech_summary: string
 }
 
+export type GitScoreExplanation = {
+  label: string
+  score: number
+  max_score: number
+  status: 'strong' | 'steady' | 'needs_attention' | string
+  summary: string
+  evidence: string[]
+  next_steps: string[]
+  low_data: boolean
+  confidence: 'high' | 'medium' | 'low' | string
+}
+
 export type CardData = {
   username: string
   avatar_url: string
@@ -59,6 +71,7 @@ export type GenerateResponse = {
   gitscore: {
     total: number
     dimensions: Record<string, number>
+    explanations?: Record<string, GitScoreExplanation>
   }
   ai_insights: AIInsights
   card_data: CardData

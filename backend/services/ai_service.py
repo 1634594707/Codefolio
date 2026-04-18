@@ -55,6 +55,110 @@ class AIService:
         await self.client.aclose()
 
     @staticmethod
+    def _extract_readme_headings(readme_text: str) -> List[str]:
+        headings: List[str] = []
+        for line in readme_text.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("#"):
+                continue
+            heading = stripped.lstrip("#").strip()
+            if heading:
+                headings.append(heading)
+            if len(headings) >= 8:
+                break
+        return headings
+
+    @staticmethod
+    def _collect_repository_signals(repository: Repository) -> dict[str, bool]:
+        file_entries = [item.lower() for item in repository.file_tree]
+        joined_files = " ".join(file_entries)
+        readme_lower = (repository.readme_text or "").lower()
+        readme_headings = [heading.lower() for heading in AIService._extract_readme_headings(repository.readme_text or "")]
+        joined_headings = " ".join(readme_headings)
+
+        return {
+            "has_tests": any(token in joined_files for token in ("test", "tests", "__tests__", "spec", "specs", "pytest", "vitest", "jest")),
+            "has_ci": ".github/workflows" in joined_files or "gitlab-ci" in joined_files or "azure-pipelines" in joined_files,
+            "has_docs_dir": any(token in joined_files for token in ("docs/", "doc/", "wiki/")),
+            "has_examples": any(token in joined_files for token in ("example", "examples", "demo", "demos")),
+            "has_container": any(token in joined_files for token in ("dockerfile", "docker-compose", "compose.yml", "compose.yaml")),
+            "has_frontend_app": any(token in joined_files for token in ("src/app", "src/pages", "public/", "index.html", "vite.config", "next.config", "app/")),
+            "has_backend_api": any(token in joined_files for token in ("api/", "server", "fastapi", "flask", "django", "express", "routes/", "controllers/")),
+            "mentions_architecture": "architecture" in joined_headings or "design" in joined_headings or "架构" in joined_headings,
+            "mentions_setup": ("install" in joined_headings or "setup" in joined_headings or "getting started" in joined_headings or "quick start" in joined_headings or "安装" in joined_headings),
+            "mentions_demo": ("demo" in joined_headings or "screenshot" in joined_headings or "preview" in joined_headings or "演示" in joined_headings or "效果" in joined_headings),
+            "mentions_api": ("api" in joined_headings or "endpoint" in readme_lower or "swagger" in readme_lower),
+        }
+
+    @staticmethod
+    def _format_repository_signal_notes(signals: dict[str, bool], language: str = "en") -> List[str]:
+        copy = {
+            "has_tests": ("Visible test-related files detected", "检测到测试相关文件"),
+            "has_ci": ("CI/workflow configuration is present", "存在 CI / 工作流配置"),
+            "has_docs_dir": ("Dedicated docs directory is present", "存在独立文档目录"),
+            "has_examples": ("Examples or demo-related files are present", "存在示例或演示相关文件"),
+            "has_container": ("Container or deployment packaging files are present", "存在容器或部署打包文件"),
+            "has_frontend_app": ("Frontend application structure is visible", "可见前端应用结构"),
+            "has_backend_api": ("Backend/API structure is visible", "可见后端 / API 结构"),
+            "mentions_architecture": ("README mentions architecture/design", "README 提到了架构或设计"),
+            "mentions_setup": ("README includes setup/getting-started cues", "README 包含安装或上手说明"),
+            "mentions_demo": ("README includes demo/preview cues", "README 包含演示或预览线索"),
+            "mentions_api": ("README references API surface", "README 提到了 API 能力"),
+        }
+        notes: List[str] = []
+        for key, enabled in signals.items():
+            if enabled and key in copy:
+                notes.append(copy[key][1] if language == "zh" else copy[key][0])
+        return notes
+
+    @staticmethod
+    def _derive_repository_fit(repository: Repository) -> tuple[str, str]:
+        signals = AIService._collect_repository_signals(repository)
+        score = 0
+        if repository.has_readme:
+            score += 2
+        if repository.has_license:
+            score += 1
+        if len(repository.file_tree) >= 4:
+            score += 1
+        if len(repository.topics) >= 2:
+            score += 1
+        if repository.stars + repository.forks >= 20:
+            score += 1
+        if signals["has_tests"]:
+            score += 1
+        if signals["has_ci"]:
+            score += 1
+        if signals["mentions_demo"] or signals["has_examples"]:
+            score += 1
+
+        evidence_count = 0
+        evidence_count += 1 if repository.has_readme else 0
+        evidence_count += 1 if repository.has_license else 0
+        evidence_count += 1 if len(repository.file_tree) >= 3 else 0
+        evidence_count += 1 if len(repository.topics) >= 2 else 0
+        evidence_count += 1 if repository.stars + repository.forks >= 5 else 0
+        evidence_count += 1 if signals["has_tests"] else 0
+        evidence_count += 1 if signals["has_ci"] else 0
+        evidence_count += 1 if signals["mentions_demo"] or signals["has_examples"] else 0
+
+        if score >= 7:
+            fit = "resume_ready"
+        elif score >= 4:
+            fit = "portfolio_ready"
+        else:
+            fit = "needs_hardening"
+
+        if evidence_count >= 6:
+            confidence = "high"
+        elif evidence_count >= 3:
+            confidence = "medium"
+        else:
+            confidence = "low"
+
+        return fit, confidence
+
+    @staticmethod
     def _extract_message_content(result: dict) -> str:
         choices = result.get("choices")
         if not choices:
@@ -365,6 +469,12 @@ Write ONLY the bullet list, nothing else."""
                 highlights=cached.get("highlights", []),
                 keywords=cached.get("keywords", []),
                 evidence=cached.get("evidence", []),
+                strengths=cached.get("strengths", []),
+                risks=cached.get("risks", []),
+                resume_bullets=cached.get("resume_bullets", []),
+                next_steps=cached.get("next_steps", []),
+                showcase_fit=cached.get("showcase_fit", ""),
+                confidence=cached.get("confidence", "medium"),
             )
 
         db_snapshot = await snapshot_store.get_snapshot(
@@ -383,21 +493,37 @@ Write ONLY the bullet list, nothing else."""
                 highlights=db_snapshot.get("highlights", []),
                 keywords=db_snapshot.get("keywords", []),
                 evidence=db_snapshot.get("evidence", []),
+                strengths=db_snapshot.get("strengths", []),
+                risks=db_snapshot.get("risks", []),
+                resume_bullets=db_snapshot.get("resume_bullets", []),
+                next_steps=db_snapshot.get("next_steps", []),
+                showcase_fit=db_snapshot.get("showcase_fit", ""),
+                confidence=db_snapshot.get("confidence", "medium"),
             )
 
         fallback = self._get_fallback_repository_analysis(repository, language)
         readme_excerpt = (repository.readme_text or "")[:3000]
+        readme_headings = self._extract_readme_headings(repository.readme_text or "")
+        observed_signals = self._collect_repository_signals(repository)
         topics_text = ", ".join(repository.topics[:8]) or "None"
         file_tree_text = ", ".join(repository.file_tree[:15]) or "Unknown"
+        readme_headings_text = ", ".join(readme_headings[:8]) or "None"
+        observed_signals_text = "; ".join(self._format_repository_signal_notes(observed_signals, language)) or "None"
         lang_instruction = "in Chinese (Simplified)" if language == "zh" else "in English"
         system_prompt = (
             "You are a senior engineer writing evidence-based repository analysis for a resume workspace. "
-            f"Respond {lang_instruction}. Return ONLY valid JSON with keys: title, summary, highlights, keywords, evidence. "
+            f"Respond {lang_instruction}. Return ONLY valid JSON with keys: title, summary, highlights, keywords, evidence, strengths, risks, resume_bullets, next_steps, showcase_fit, confidence. "
             "Use only the provided facts. Do not invent business impact, production usage, users, code quality, "
             "architecture quality, maintainership, or team size. Avoid generic praise. "
-            "title: one short factual line. summary: 1-2 concise sentences. "
+            "title: one short factual line. summary: 2-4 concise sentences that explain what the repository demonstrates and what remains unclear. "
             "highlights: exactly 3 short factual bullets. keywords: 3-5 short factual tags without #. "
-            "evidence: 3-5 short fact strings quoted from or directly derived from the inputs."
+            "evidence: 3-5 short fact strings quoted from or directly derived from the inputs. "
+            "strengths: 2-4 concrete strengths visible from docs, structure, activity, topics, or traction. "
+            "risks: 1-3 concrete gaps, ambiguities, or missing trust signals. "
+            "resume_bullets: 2-3 sharper bullets the user could adapt into a resume or portfolio description, still factual and non-hyped. "
+            "next_steps: 2-3 specific improvements that would make the repository easier to trust, review, or present. "
+            "showcase_fit: one of resume_ready, portfolio_ready, needs_hardening. "
+            "confidence: one of high, medium, low based on how much direct public evidence exists."
         )
         user_prompt = f"""Repository facts:
 - Owner: {user_data.username}
@@ -410,6 +536,8 @@ Write ONLY the bullet list, nothing else."""
 - Has README: {repository.has_readme}
 - Has License: {repository.has_license}
 - Root files: {file_tree_text}
+- README headings: {readme_headings_text}
+- Observed engineering signals: {observed_signals_text}
 - README excerpt:
 {readme_excerpt or "N/A"}
 
@@ -426,6 +554,12 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                 highlights=[str(item).strip() for item in payload.get("highlights", []) if str(item).strip()][:3],
                 keywords=[str(item).strip() for item in payload.get("keywords", []) if str(item).strip()][:5],
                 evidence=[str(item).strip() for item in payload.get("evidence", []) if str(item).strip()][:5],
+                strengths=[str(item).strip() for item in payload.get("strengths", []) if str(item).strip()][:4],
+                risks=[str(item).strip() for item in payload.get("risks", []) if str(item).strip()][:3],
+                resume_bullets=[str(item).strip() for item in payload.get("resume_bullets", []) if str(item).strip()][:3],
+                next_steps=[str(item).strip() for item in payload.get("next_steps", []) if str(item).strip()][:3],
+                showcase_fit=str(payload.get("showcase_fit", "")).strip() or fallback.showcase_fit,
+                confidence=str(payload.get("confidence", "")).strip() or fallback.confidence,
             )
             while len(result.highlights) < 3:
                 result.highlights.append(fallback.highlights[len(result.highlights)])
@@ -433,6 +567,14 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                 result.keywords = fallback.keywords
             if not result.evidence:
                 result.evidence = fallback.evidence
+            if not result.strengths:
+                result.strengths = fallback.strengths
+            if not result.risks:
+                result.risks = fallback.risks
+            if not result.resume_bullets:
+                result.resume_bullets = fallback.resume_bullets
+            if not result.next_steps:
+                result.next_steps = fallback.next_steps
             await redis_client.set(
                 cache_key,
                 {
@@ -441,6 +583,12 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                     "highlights": result.highlights,
                     "keywords": result.keywords,
                     "evidence": result.evidence,
+                    "strengths": result.strengths,
+                    "risks": result.risks,
+                    "resume_bullets": result.resume_bullets,
+                    "next_steps": result.next_steps,
+                    "showcase_fit": result.showcase_fit,
+                    "confidence": result.confidence,
                 },
                 AI_CACHE_TTL,
             )
@@ -453,6 +601,12 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                     "highlights": result.highlights,
                     "keywords": result.keywords,
                     "evidence": result.evidence,
+                    "strengths": result.strengths,
+                    "risks": result.risks,
+                    "resume_bullets": result.resume_bullets,
+                    "next_steps": result.next_steps,
+                    "showcase_fit": result.showcase_fit,
+                    "confidence": result.confidence,
                 },
                 language=language,
                 tenant_scope=workspace_scope,
@@ -469,6 +623,12 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                     "highlights": fallback.highlights,
                     "keywords": fallback.keywords,
                     "evidence": fallback.evidence,
+                    "strengths": fallback.strengths,
+                    "risks": fallback.risks,
+                    "resume_bullets": fallback.resume_bullets,
+                    "next_steps": fallback.next_steps,
+                    "showcase_fit": fallback.showcase_fit,
+                    "confidence": fallback.confidence,
                 },
                 language=language,
                 tenant_scope=workspace_scope,
@@ -546,4 +706,116 @@ Write an evidence-based analysis. If evidence is weak, say that explicitly inste
                 f"Traction: {traction_signal}",
                 f"Structure: {structure_signal}",
             ],
+        )
+
+    def _get_fallback_repository_analysis(self, repository: Repository, language: str = "en") -> RepositoryAIAnalysis:
+        language_label = repository.language or ("多技术栈" if language == "zh" else "multi-stack")
+        docs_signal = "README + LICENSE" if repository.has_readme and repository.has_license else (
+            "README only" if repository.has_readme else ("LICENSE only" if repository.has_license else "limited docs signals")
+        )
+        structure_signal = ", ".join(repository.file_tree[:4]) if repository.file_tree else (
+            "公开结构信息有限" if language == "zh" else "limited visible structure"
+        )
+        traction_signal = f"{repository.stars} stars / {repository.forks} forks"
+        keywords = repository.topics[:4] or [repository.language or "project", "github", "resume"]
+        observed_signals = self._collect_repository_signals(repository)
+        signal_notes = self._format_repository_signal_notes(observed_signals, language)
+        showcase_fit, confidence = self._derive_repository_fit(repository)
+
+        if language == "zh":
+            title = f"{repository.name} 仓库快照"
+            summary = (
+                f"{repository.name} 是一个公开的 {language_label} 仓库，目前能看到的主要证据来自 {docs_signal}、主题标签、"
+                f"文件结构和基础互动数据。它可以被视为一个有明确工程痕迹的项目，但如果缺少演示、测试或架构说明，"
+                "外部读者仍然很难快速判断实现深度。"
+            )
+            highlights = [
+                f"技术栈可见：{language_label}",
+                f"文档与结构信号：{docs_signal}；{structure_signal}",
+                f"公开互动信号：{traction_signal}",
+            ]
+            strengths = [
+                f"至少能直接看出主要实现语言或技术栈：{language_label}",
+                f"仓库基础可信度信号为 {docs_signal}",
+                f"存在公开互动数据，可作为外部关注度参考：{traction_signal}",
+            ]
+            if signal_notes:
+                strengths.append(f"额外工程信号：{signal_notes[0]}")
+            risks = [
+                "当前判断主要依赖公开 README、文件结构和基础元数据，证据面仍然偏窄。",
+                "如果缺少演示、测试说明或架构说明，读者很难判断工程完成度和复杂度。",
+            ]
+            if not observed_signals["has_tests"]:
+                risks.append("未看到明显测试目录或测试配置，工程可验证性不足。")
+            resume_bullets = [
+                f"独立构建并维护 {repository.name}，采用 {language_label} 实现，公开仓库可直接查看结构与基础文档。",
+                f"仓库当前已有 {traction_signal} 的公开互动数据，可作为项目可见度的辅助证明。",
+            ]
+            next_steps = [
+                "在 README 中补齐问题定义、核心方案、运行方式和结果展示。",
+                "补充测试、CI、截图或架构说明，降低别人评估项目价值的成本。",
+            ]
+            if not observed_signals["has_ci"]:
+                next_steps.append("补充 CI 或自动化检查，让外部读者更容易相信项目持续可维护。")
+            evidence = [
+                f"语言：{language_label}",
+                f"文档：{docs_signal}",
+                f"互动：{traction_signal}",
+                f"结构：{structure_signal}",
+            ]
+        else:
+            title = f"{repository.name} project snapshot"
+            summary = (
+                f"{repository.name} is a public {language_label} repository with visible signals from {docs_signal}, topics, "
+                f"file structure, and basic traction. It can be presented as a real engineering project, but if demos, tests, "
+                "or architecture notes are missing, reviewers still have limited evidence for implementation depth."
+            )
+            highlights = [
+                f"Visible stack: {language_label}",
+                f"Docs and structure: {docs_signal}; {structure_signal}",
+                f"Public traction: {traction_signal}",
+            ]
+            strengths = [
+                f"The implementation stack is visible: {language_label}",
+                f"Baseline trust signals are present: {docs_signal}",
+                f"Public traction is measurable: {traction_signal}",
+            ]
+            if signal_notes:
+                strengths.append(f"Extra engineering signal: {signal_notes[0]}")
+            risks = [
+                "The assessment is still limited to public README, file structure, and repository metadata.",
+                "Without demos, tests, or architecture notes, depth and completeness are harder for reviewers to verify.",
+            ]
+            if not observed_signals["has_tests"]:
+                risks.append("No obvious test directory or test tooling is visible, which weakens implementation trust.")
+            resume_bullets = [
+                f"Built and maintained {repository.name} in {language_label}, with public repository structure and baseline documentation available for review.",
+                f"Repository currently shows {traction_signal}, providing some external proof that the work is visible and reusable.",
+            ]
+            next_steps = [
+                "Add a clearer README section covering the problem, approach, setup, and outputs.",
+                "Surface tests, CI, screenshots, or architecture notes so reviewers can evaluate implementation depth faster.",
+            ]
+            if not observed_signals["has_ci"]:
+                next_steps.append("Add CI or automated checks so the repository feels actively maintained and verifiable.")
+            evidence = [
+                f"Language: {language_label}",
+                f"Docs: {docs_signal}",
+                f"Traction: {traction_signal}",
+                f"Structure: {structure_signal}",
+            ]
+
+        return RepositoryAIAnalysis(
+            repo_name=repository.name,
+            title=title,
+            summary=summary,
+            highlights=highlights,
+            keywords=keywords,
+            evidence=evidence,
+            strengths=strengths,
+            risks=risks,
+            resume_bullets=resume_bullets,
+            next_steps=next_steps,
+            showcase_fit=showcase_fit,
+            confidence=confidence,
         )

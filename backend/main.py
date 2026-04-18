@@ -57,6 +57,7 @@ class RepositoryAnalysisRequestModel(BaseModel):
 class ExportPdfRequestModel(BaseModel):
     username: str
     language: Literal["en", "zh"] = "en"
+    resume_markdown: Optional[str] = None
     extra_markdown: Optional[str] = None
 
 
@@ -72,7 +73,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Codefolio API",
     description="GitHub profile analyzer API",
-    version="1.3.0",
+    version="1.3.2",
     lifespan=lifespan,
 )
 
@@ -215,7 +216,7 @@ async def build_generation_payload(
 ) -> dict:
     user_data = await github_service.fetch_user_data(username, user_token=user_token)
     star_history = GitHubService.compute_star_history_from_user_data(user_data)
-    gitscore = score_engine.calculate_gitscore(user_data)
+    gitscore = score_engine.calculate_gitscore(user_data, language=language)
 
     languages_to_generate = SUPPORTED_CONTENT_LANGUAGES if include_all_languages else (language,)
     ai_service = AIService()
@@ -364,7 +365,7 @@ async def generate_profile_stream(request: GenerateRequestModel, http_request: R
             yield "event: github_fetched\ndata: {}\n\n"
 
             # Stage 2: Calculate score
-            gitscore = score_engine.calculate_gitscore(user_data)
+            gitscore = score_engine.calculate_gitscore(user_data, language=request.language)
             yield "event: score_calculated\ndata: {}\n\n"
 
             # Stage 3: Signal AI generation starting
@@ -464,13 +465,15 @@ async def export_pdf_post(request: ExportPdfRequestModel, http_request: Request)
     workspace_scope = normalize_workspace_scope(http_request.headers.get(WORKSPACE_HEADER))
     await ensure_workspace_scope(workspace_scope)
     try:
-        payload = await build_generation_payload(
-            sanitized_username,
-            request.language,
-            include_all_languages=False,
-            workspace_scope=workspace_scope,
-        )
-        resume_markdown = payload["resume_markdown"]
+        resume_markdown = (request.resume_markdown or "").strip()
+        if not resume_markdown:
+            payload = await build_generation_payload(
+                sanitized_username,
+                request.language,
+                include_all_languages=False,
+                workspace_scope=workspace_scope,
+            )
+            resume_markdown = payload["resume_markdown"]
         if request.extra_markdown:
             resume_markdown = resume_markdown + "\n\n" + request.extra_markdown
         pdf_bytes = render_service.generate_pdf_resume(resume_markdown)

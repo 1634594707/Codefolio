@@ -77,6 +77,11 @@ const labels = {
     selectedProjects: 'Selected projects',
     structure: 'Key files',
     topics: 'Topics',
+    evidence: 'Evidence',
+    strengths: 'What looks strong',
+    risks: 'What is still unclear',
+    resumeBullets: 'Resume-ready bullets',
+    nextSteps: 'How to improve this repo',
   },
   zh: {
     title: '仓库',
@@ -141,6 +146,19 @@ function formatDate(value: string | undefined, language: 'en' | 'zh'): string {
   })
 }
 
+function formatShowcaseFit(value: string | undefined, language: 'en' | 'zh'): string {
+  if (value === 'resume_ready') return language === 'zh' ? '适合直接放简历' : 'Ready for resume'
+  if (value === 'portfolio_ready') return language === 'zh' ? '更适合作品集展示' : 'Better for portfolio'
+  if (value === 'needs_hardening') return language === 'zh' ? '建议补强后再展示' : 'Needs hardening first'
+  return language === 'zh' ? '待判断' : 'Needs review'
+}
+
+function formatConfidence(value: string | undefined, language: 'en' | 'zh'): string {
+  if (value === 'high') return language === 'zh' ? '高' : 'High'
+  if (value === 'low') return language === 'zh' ? '低' : 'Low'
+  return language === 'zh' ? '中' : 'Medium'
+}
+
 export function Repositories({ language }: RepositoriesProps) {
   const {
     contentLanguage,
@@ -151,7 +169,7 @@ export function Repositories({ language }: RepositoriesProps) {
     setRepoAnalysis,
     getRepoAnalysis,
   } = useApp()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const username = searchParams.get('user') || ''
   const targetRepo = searchParams.get('repo') || ''
@@ -167,6 +185,16 @@ export function Repositories({ language }: RepositoriesProps) {
   const [repoAnalysisMap, setRepoAnalysisMap] = useState<Record<string, RepositoryAnalysisPayload>>({})
   const text = labels[language]
   const selectedProjects = getResumeProjects(username)
+
+  const syncRepoParam = (repoName: string | null) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (repoName) {
+      nextParams.set('repo', repoName)
+    } else {
+      nextParams.delete('repo')
+    }
+    setSearchParams(nextParams, { replace: true })
+  }
 
   // Requirement 6.3: On mount, initialize local repoAnalysisMap from AppContext cache
   useEffect(() => {
@@ -281,11 +309,14 @@ export function Repositories({ language }: RepositoriesProps) {
 
   const analyzeRepo = async (repo: Repo) => {
     if (repoAnalysisMap[repo.name]) {
-      setExpandedRepo((current) => (current === repo.name ? null : repo.name))
+      const nextExpandedRepo = expandedRepo === repo.name ? null : repo.name
+      setExpandedRepo(nextExpandedRepo)
+      syncRepoParam(nextExpandedRepo)
       return
     }
 
     setExpandedRepo(repo.name)
+    syncRepoParam(repo.name)
     setAnalysisLoadingRepo(repo.name)
     try {
       const response = await axios.post<RepositoryAnalysisPayload>(`${API_BASE_URL}/api/repository/analyze`, {
@@ -320,9 +351,16 @@ export function Repositories({ language }: RepositoriesProps) {
   }
 
   useEffect(() => {
-    if (!targetRepo || repos.length === 0 || analysisLoadingRepo) return
+    if (!targetRepo) {
+      setExpandedRepo(null)
+      return
+    }
+    if (repos.length === 0 || analysisLoadingRepo) return
     const matchedRepo = repos.find((repo) => repo.name.toLowerCase() === targetRepo.trim().toLowerCase())
-    if (!matchedRepo) return
+    if (!matchedRepo) {
+      setExpandedRepo(null)
+      return
+    }
     if (expandedRepo === matchedRepo.name || repoAnalysisMap[matchedRepo.name]) {
       setExpandedRepo(matchedRepo.name)
       return
@@ -513,6 +551,78 @@ export function Repositories({ language }: RepositoriesProps) {
                         {project.keywords.map((keyword: string) => (
                           <span key={keyword} className="repo-badge">{keyword}</span>
                         ))}
+                      </div>
+                    )}
+                    {repoAnalysis?.analysis?.showcase_fit && (
+                      <div className="repo-analysis-section">
+                        <span className="topbar-search-suggestions-label">
+                          {language === 'zh' ? '展示建议' : 'Showcase fit'}
+                        </span>
+                        <p>
+                          {formatShowcaseFit(repoAnalysis.analysis.showcase_fit, language)}
+                          {' · '}
+                          {language === 'zh' ? '置信度' : 'Confidence'}: {formatConfidence(repoAnalysis.analysis.confidence, language)}
+                        </p>
+                      </div>
+                    )}
+                    {repoAnalysis?.analysis?.strengths && repoAnalysis.analysis.strengths.length > 0 && (
+                      <div className="repo-analysis-section">
+                        <span className="topbar-search-suggestions-label">
+                          {language === 'zh' ? '当前优势' : 'What looks strong'}
+                        </span>
+                        <ul className="repo-analysis-list">
+                          {repoAnalysis.analysis.strengths.map((item: string) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {repoAnalysis?.analysis?.risks && repoAnalysis.analysis.risks.length > 0 && (
+                      <div className="repo-analysis-section">
+                        <span className="topbar-search-suggestions-label">
+                          {language === 'zh' ? '当前缺口' : 'What is still unclear'}
+                        </span>
+                        <ul className="repo-analysis-list">
+                          {repoAnalysis.analysis.risks.map((item: string) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {repoAnalysis?.analysis?.resume_bullets && repoAnalysis.analysis.resume_bullets.length > 0 && (
+                      <div className="repo-analysis-section">
+                        <span className="topbar-search-suggestions-label">
+                          {language === 'zh' ? '可直接改写到简历' : 'Resume-ready bullets'}
+                        </span>
+                        <ul className="repo-analysis-list">
+                          {repoAnalysis.analysis.resume_bullets.map((item: string) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {repoAnalysis?.analysis?.next_steps && repoAnalysis.analysis.next_steps.length > 0 && (
+                      <div className="repo-analysis-section">
+                        <span className="topbar-search-suggestions-label">
+                          {language === 'zh' ? '下一步优化建议' : 'How to improve this repo'}
+                        </span>
+                        <ul className="repo-analysis-list">
+                          {repoAnalysis.analysis.next_steps.map((item: string) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {repoAnalysis?.analysis?.evidence && repoAnalysis.analysis.evidence.length > 0 && (
+                      <div className="repo-analysis-section">
+                        <span className="topbar-search-suggestions-label">
+                          {language === 'zh' ? '证据' : 'Evidence'}
+                        </span>
+                        <ul className="repo-analysis-list">
+                          {repoAnalysis.analysis.evidence.map((item: string) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                     {repo.topics && repo.topics.length > 0 && (

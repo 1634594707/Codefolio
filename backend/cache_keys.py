@@ -4,7 +4,7 @@ GitHubService, AIService, and cache invalidation (e.g. DELETE /api/cache/{userna
 """
 
 GITHUB_USER_CACHE_VERSION = "v4"
-REPOSITORY_ANALYSIS_CACHE_VERSION = "v2"
+REPOSITORY_ANALYSIS_CACHE_VERSION = "v4"
 REPOSITORY_PROFILE_CACHE_VERSION = "v1"
 
 

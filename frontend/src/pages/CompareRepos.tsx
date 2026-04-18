@@ -21,6 +21,10 @@ interface BenchmarkSuggestion {
   reason_code: string
   reason_params: Record<string, string | number | string[]>
   stars: number
+  reason_title: string
+  reason_summary: string
+  learn_from: string
+  badges: string[]
 }
 
 const labels = {
@@ -87,6 +91,8 @@ const labels = {
     suggestError: 'Failed to fetch suggestions.',
     noSuggestions: 'No suggestions found.',
     addSuggestion: 'Add',
+    whyItFits: 'Why it fits',
+    whatToLearn: 'What to learn',
   },
   zh: {
     title: '仓库对标',
@@ -205,6 +211,8 @@ export function CompareRepos({ language }: CompareReposProps) {
   const [suggestError, setSuggestError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const filledBenchmarkCount = benchmarkInputs.filter((item) => item.trim()).length
+  const whyItFitsLabel = language === 'zh' ? '推荐理由' : text.whyItFits
+  const whatToLearnLabel = language === 'zh' ? '可以重点学什么' : text.whatToLearn
 
   useEffect(() => {
     setMineInput(searchParams.get('mine') ?? '')
@@ -485,6 +493,22 @@ export function CompareRepos({ language }: CompareReposProps) {
                         <strong>{s.full_name}</strong>
                         <span className="compare-tag">{s.reason_code}</span>
                         <span className="compare-hint">★{s.stars.toLocaleString()}</span>
+                        <div className="repo-suggestion-copy">
+                          <div className="repo-suggestion-tags">
+                            {(s.badges ?? []).map((badge) => (
+                              <span key={`${s.full_name}-${badge}`} className="compare-tag">
+                                {badge}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="repo-suggestion-title">{s.reason_title || s.reason_code}</p>
+                          <p className="repo-suggestion-summary">
+                            <strong>{whyItFitsLabel}:</strong> {s.reason_summary}
+                          </p>
+                          <p className="repo-suggestion-summary">
+                            <strong>{whatToLearnLabel}:</strong> {s.learn_from}
+                          </p>
+                        </div>
                       </div>
                       <button
                         type="button"

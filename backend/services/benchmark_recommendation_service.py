@@ -35,6 +35,47 @@ def _size_category(stars: int) -> str:
 class BenchmarkRecommendationService:
     """Suggests relevant benchmark repositories based on similarity."""
 
+    COPY = {
+        "en": {
+            "size": {
+                "small": "Small-scale peer",
+                "medium": "Mid-scale peer",
+                "large": "Large-scale peer",
+            },
+            "reason": {
+                "overlap_topic_language": {
+                    "title": "Strong topical overlap",
+                    "summary": "Shares {language} and overlapping topics: {topics}. This is a closer apples-to-apples benchmark.",
+                    "learn_from": "Study how it frames the same problem space, packages the README, and turns similar topics into stronger traction.",
+                },
+                "same_language_size": {
+                    "title": "Similar stack and scale",
+                    "summary": "Built in {language} and sits in a similar popularity bucket, so the comparison stays realistic.",
+                    "learn_from": "Use it to compare repository hygiene, onboarding, release discipline, and polish without jumping to an unrealistic outlier.",
+                },
+            },
+        },
+        "zh": {
+            "size": {
+                "small": "同量级小体量项目",
+                "medium": "同量级中等项目",
+                "large": "同量级大型项目",
+            },
+            "reason": {
+                "overlap_topic_language": {
+                    "title": "主题高度相近",
+                    "summary": "同样使用 {language}，并且和你的仓库共享这些主题：{topics}。这是更接近同类对比的标杆。",
+                    "learn_from": "重点观察它如何定义同类问题、组织 README，以及把相近主题做出更强的传播和采用。",
+                },
+                "same_language_size": {
+                    "title": "技术栈和体量接近",
+                    "summary": "同样基于 {language}，而且项目热度处在相近体量区间，参考价值更现实。",
+                    "learn_from": "适合拿来对比仓库卫生、上手体验、发布节奏和整体完成度，而不是和过大体量项目硬比。",
+                },
+            },
+        },
+    }
+
     def __init__(
         self,
         github_service: Optional[GitHubService] = None,
@@ -87,6 +128,7 @@ class BenchmarkRecommendationService:
         repo_topics = profile.topics or []
         repo_stars = profile.stars
         mine_lower = mine.strip().lower()
+        copy = self.COPY.get(language, self.COPY["en"])
 
         candidates: list[BenchmarkSuggestion] = []
 
@@ -110,14 +152,16 @@ class BenchmarkRecommendationService:
                 if _size_category(item_stars) != _size_category(repo_stars):
                     continue
                 candidates.append(
-                    BenchmarkSuggestion(
+                    self._build_suggestion(
                         full_name=item.get("full_name", ""),
                         reason_code="overlap_topic_language",
                         reason_params={
                             "topics": overlapping,
                             "language": repo_language,
+                            "size_category": _size_category(item_stars),
                         },
                         stars=item_stars,
+                        copy=copy,
                     )
                 )
                 if len(candidates) >= limit * 3:
@@ -139,11 +183,15 @@ class BenchmarkRecommendationService:
                 if _size_category(item_stars) != _size_category(repo_stars):
                     continue
                 candidates.append(
-                    BenchmarkSuggestion(
+                    self._build_suggestion(
                         full_name=item.get("full_name", ""),
                         reason_code="same_language_size",
-                        reason_params={"language": repo_language},
+                        reason_params={
+                            "language": repo_language,
+                            "size_category": _size_category(item_stars),
+                        },
                         stars=item_stars,
+                        copy=copy,
                     )
                 )
                 if len(candidates) >= limit * 3:
@@ -168,6 +216,10 @@ class BenchmarkRecommendationService:
                 "reason_code": s.reason_code,
                 "reason_params": s.reason_params,
                 "stars": s.stars,
+                "reason_title": s.reason_title,
+                "reason_summary": s.reason_summary,
+                "learn_from": s.learn_from,
+                "badges": s.badges,
             }
             for s in suggestions
         ]
@@ -240,3 +292,29 @@ class BenchmarkRecommendationService:
                     logger.warning("GitHub Search API error: %s", exc)
 
         return results
+
+    def _build_suggestion(
+        self,
+        full_name: str,
+        reason_code: str,
+        reason_params: dict,
+        stars: int,
+        copy: dict,
+    ) -> BenchmarkSuggestion:
+        topics = reason_params.get("topics", [])
+        language = reason_params.get("language") or "Code"
+        size_category = reason_params.get("size_category") or _size_category(stars)
+        template = copy["reason"][reason_code]
+        topic_text = ", ".join(topics[:3]) if topics else language
+        badges = [language, copy["size"][size_category]]
+        badges.extend(topics[:2])
+        return BenchmarkSuggestion(
+            full_name=full_name,
+            reason_code=reason_code,
+            reason_params=reason_params,
+            stars=stars,
+            reason_title=template["title"],
+            reason_summary=template["summary"].format(language=language, topics=topic_text),
+            learn_from=template["learn_from"],
+            badges=badges,
+        )

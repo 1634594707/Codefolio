@@ -1,5 +1,20 @@
 # Changelog
 
+## [v1.3.2] - 2026-04-18
+
+### Added
+
+- GitScore dimension explanations in the backend payload and AI analysis view, including evidence, next steps, low-data handling, and strongest/weakest dimension cues
+- Structured repository analysis fields for strengths, risks, resume-ready bullets, next steps, showcase fit, confidence, and evidence-backed engineering signals
+- Focused frontend regression coverage for repository analysis URL persistence and export PDF reuse flows
+
+### Changed
+
+- Repository analysis prompts now incorporate README headings plus engineering-signal detection for tests, CI, docs, examples, container files, frontend/backend structure, and API/demo cues
+- Repository and overview analysis panels now render richer sections instead of a short templated summary, making the output easier to review and adapt for resumes or portfolios
+- Export PDF generation now reuses already available Markdown artifacts when possible and prefers richer resume bullets over generic highlights for selected projects
+- Benchmark suggestions and GitScore explanations are now more actionable in both the API shape and frontend presentation
+- Repository analysis cache versioning was bumped to refresh older, shallow analysis snapshots
 ## [v1.3.1] - 2026-04-17
 
 ### Added

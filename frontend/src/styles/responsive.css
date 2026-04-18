@@ -11,6 +11,10 @@
   .analysis-grid {
     grid-template-columns: 1fr;
   }
+
+  .analysis-explainability-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {

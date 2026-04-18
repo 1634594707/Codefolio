@@ -41,6 +41,8 @@ interface AIInsights {
 
 interface GitScore {
 
+  explanations?: Record<string, GitScoreExplanation>
+
   total: number
 
   dimensions: {
@@ -56,6 +58,46 @@ interface GitScore {
     documentation: number
 
   }
+
+}
+
+interface GenerateCachePayload {
+
+  gitscore?: GitScore
+
+  ai_insights?: AIInsights
+
+  language_trends?: LanguageTrend[]
+
+  user?: UserData
+
+  card_data?: {
+
+    radar_chart_data?: number[]
+
+  }
+
+}
+
+interface GitScoreExplanation {
+
+  label: string
+
+  score: number
+
+  max_score: number
+
+  status: 'strong' | 'steady' | 'needs_attention' | string
+
+  summary: string
+
+  evidence: string[]
+
+  next_steps: string[]
+
+  low_data: boolean
+
+  confidence: 'high' | 'medium' | 'low' | string
 
 }
 
@@ -125,6 +167,22 @@ const labels = {
 
     trends: 'Skill Trends',
 
+    scoreExplainability: 'How This Score Was Calculated',
+
+    strongestDimension: 'Strongest signal',
+
+    weakestDimension: 'Best improvement opportunity',
+
+    evidence: 'Why it scored this way',
+
+    nextSteps: 'How to improve',
+
+    lowData: 'Limited public data',
+
+    confidenceLow: 'Low confidence',
+
+    confidenceMedium: 'Medium confidence',
+
     dimensions: {
 
       impact: 'Impact',
@@ -167,6 +225,12 @@ const labels = {
 
     trends: '技能趋势',
 
+    lowData: '公开数据较少',
+
+    confidenceLow: '置信度较低',
+
+    confidenceMedium: '置信度中等',
+
     dimensions: {
 
       impact: '影响力',
@@ -205,6 +269,8 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
   const [gitscore, setGitscore] = useState<GitScore | null>(null)
 
+  const [radarChartData, setRadarChartData] = useState<number[]>([])
+
   const [insights, setInsights] = useState<AIInsights | null>(null)
 
   const [languageTrends, setLanguageTrends] = useState<LanguageTrend[]>([])
@@ -214,6 +280,22 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
   const [error, setError] = useState('')
 
   const text = labels[language]
+
+  const scoreExplainabilityLabel = language === 'zh' ? '评分解释' : 'How This Score Was Calculated'
+
+  const strongestDimensionLabel = language === 'zh' ? '当前最强维度' : 'Strongest signal'
+
+  const weakestDimensionLabel = language === 'zh' ? '最值得优先提升' : 'Best improvement opportunity'
+
+  const evidenceLabel = language === 'zh' ? '得分依据' : 'Why it scored this way'
+
+  const nextStepsLabel = language === 'zh' ? '提升建议' : 'How to improve'
+
+  const lowDataLabel = language === 'zh' ? '公开数据较少' : 'Limited public data'
+
+  const confidenceLowLabel = language === 'zh' ? '置信度较低' : 'Low confidence'
+
+  const confidenceMediumLabel = language === 'zh' ? '置信度中等' : 'Medium confidence'
 
 
 
@@ -227,6 +309,8 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
       setGitscore(null)
 
+      setRadarChartData([])
+
       setInsights(null)
 
       setLanguageTrends([])
@@ -239,13 +323,15 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
     if (cachedEntry) {
 
-      const d = cachedEntry.data
+      const d = cachedEntry.data as unknown as GenerateCachePayload
 
       setUserData(d.user as UserData)
 
-      setGitscore(d.gitscore as GitScore)
+      setGitscore((d.gitscore as GitScore) ?? null)
 
-      setInsights(d.ai_insights)
+      setRadarChartData(d.card_data?.radar_chart_data ?? [])
+
+      setInsights(d.ai_insights ?? null)
 
       setLanguageTrends(d.language_trends ?? [])
 
@@ -260,6 +346,8 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
     setUserData(null)
 
     setGitscore(null)
+
+    setRadarChartData([])
 
     setInsights(null)
 
@@ -301,6 +389,8 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
       setGitscore(null)
 
+      setRadarChartData([])
+
       setInsights(null)
 
       setLanguageTrends([])
@@ -339,6 +429,8 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
         setGitscore(response.data.gitscore)
 
+        setRadarChartData(response.data.card_data?.radar_chart_data ?? [])
+
         setInsights(response.data.ai_insights)
 
         setLanguageTrends(response.data.language_trends ?? [])
@@ -373,19 +465,61 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
 
 
 
-  const radarData = gitscore
+  const radarValues =
+
+    gitscore
+
+      ? [
+
+          gitscore.dimensions.impact ?? radarChartData[0] ?? 0,
+
+          gitscore.dimensions.contribution ?? radarChartData[1] ?? 0,
+
+          gitscore.dimensions.community ?? radarChartData[2] ?? 0,
+
+          gitscore.dimensions.tech_breadth ?? radarChartData[3] ?? 0,
+
+          gitscore.dimensions.documentation ?? radarChartData[4] ?? 0,
+
+        ]
+
+      : radarChartData
+
+
+
+  const radarData = radarValues.length > 0
 
     ? [
 
-        { subject: text.dimensions.impact, value: gitscore.dimensions.impact, fullMark: 35 },
+        {
+          subject: text.dimensions.impact,
+          value: radarValues[0] ?? 0,
+          fullMark: gitscore?.explanations?.impact?.max_score ?? 35,
+        },
 
-        { subject: text.dimensions.contribution, value: gitscore.dimensions.contribution, fullMark: 25 },
+        {
+          subject: text.dimensions.contribution,
+          value: radarValues[1] ?? 0,
+          fullMark: gitscore?.explanations?.contribution?.max_score ?? 25,
+        },
 
-        { subject: text.dimensions.community, value: gitscore.dimensions.community, fullMark: 20 },
+        {
+          subject: text.dimensions.community,
+          value: radarValues[2] ?? 0,
+          fullMark: gitscore?.explanations?.community?.max_score ?? 20,
+        },
 
-        { subject: text.dimensions.breadth, value: gitscore.dimensions.tech_breadth, fullMark: 15 },
+        {
+          subject: text.dimensions.breadth,
+          value: radarValues[3] ?? 0,
+          fullMark: gitscore?.explanations?.tech_breadth?.max_score ?? 15,
+        },
 
-        { subject: text.dimensions.documentation, value: gitscore.dimensions.documentation, fullMark: 5 },
+        {
+          subject: text.dimensions.documentation,
+          value: radarValues[4] ?? 0,
+          fullMark: gitscore?.explanations?.documentation?.max_score ?? 5,
+        },
 
       ]
 
@@ -402,6 +536,48 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
     return days.map((d) => d.contribution_count)
 
   }, [userData])
+
+
+
+  const dimensionExplanations = useMemo(() => {
+
+    if (!gitscore?.explanations) return [] as GitScoreExplanation[]
+
+    return [
+
+      gitscore.explanations.impact,
+
+      gitscore.explanations.contribution,
+
+      gitscore.explanations.community,
+
+      gitscore.explanations.tech_breadth,
+
+      gitscore.explanations.documentation,
+
+    ].filter(Boolean) as GitScoreExplanation[]
+
+  }, [gitscore])
+
+
+
+  const strongestExplanation = useMemo(() => {
+
+    if (dimensionExplanations.length === 0) return null
+
+    return [...dimensionExplanations].sort((a, b) => (b.score / b.max_score) - (a.score / a.max_score))[0]
+
+  }, [dimensionExplanations])
+
+
+
+  const weakestExplanation = useMemo(() => {
+
+    if (dimensionExplanations.length === 0) return null
+
+    return [...dimensionExplanations].sort((a, b) => (a.score / a.max_score) - (b.score / b.max_score))[0]
+
+  }, [dimensionExplanations])
 
 
 
@@ -518,8 +694,12 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
           <h3 className="card-title">{text.score}</h3>
 
           <div className="radar-wrapper">
-            <div role="img" aria-label={language === 'zh' ? 'GitScore 雷达图' : 'GitScore radar chart'}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div
+              role="img"
+              aria-label={language === 'zh' ? 'GitScore 雷达图' : 'GitScore radar chart'}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <ResponsiveContainer width="100%" height={250}>
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="var(--color-outline-variant)" />
                   <PolarAngleAxis
@@ -587,6 +767,121 @@ export function AIAnalysis({ language }: AIAnalysisProps) {
       </div>
 
 
+
+      {dimensionExplanations.length > 0 && (
+
+        <div className="analysis-section">
+
+          <h3 className="section-title">{scoreExplainabilityLabel}</h3>
+
+          <div className="analysis-explainability-grid">
+
+            {dimensionExplanations.map((explanation) => (
+
+              <article
+                key={explanation.label}
+                className={`analysis-card explanation-card explanation-${explanation.status}`}
+              >
+
+                <div className="explanation-header">
+
+                  <div>
+
+                    <span className="card-kicker">{explanation.label}</span>
+
+                    <h4 className="explanation-title">
+                      {explanation.score.toFixed(1)} / {explanation.max_score.toFixed(0)}
+                    </h4>
+
+                  </div>
+
+                  <div className="explanation-flags">
+
+                    {strongestExplanation?.label === explanation.label && (
+
+                      <span className="explanation-flag">{strongestDimensionLabel}</span>
+
+                    )}
+
+                    {weakestExplanation?.label === explanation.label && (
+
+                      <span className="explanation-flag">{weakestDimensionLabel}</span>
+
+                    )}
+
+                    {explanation.low_data && (
+
+                      <span className="explanation-flag explanation-flag-muted">{lowDataLabel}</span>
+
+                    )}
+
+                    {explanation.confidence === 'low' && (
+
+                      <span className="explanation-flag explanation-flag-muted">{confidenceLowLabel}</span>
+
+                    )}
+
+                    {explanation.confidence === 'medium' && (
+
+                      <span className="explanation-flag explanation-flag-muted">{confidenceMediumLabel}</span>
+
+                    )}
+
+                  </div>
+
+                </div>
+
+                <p className="explanation-summary">{explanation.summary}</p>
+
+                {explanation.evidence.length > 0 && (
+
+                  <>
+
+                    <h5 className="explanation-subtitle">{evidenceLabel}</h5>
+
+                    <ul className="explanation-list">
+
+                      {explanation.evidence.map((item) => (
+
+                        <li key={item}>{item}</li>
+
+                      ))}
+
+                    </ul>
+
+                  </>
+
+                )}
+
+                {explanation.next_steps.length > 0 && (
+
+                  <>
+
+                    <h5 className="explanation-subtitle">{nextStepsLabel}</h5>
+
+                    <ul className="explanation-list">
+
+                      {explanation.next_steps.map((item) => (
+
+                        <li key={item}>{item}</li>
+
+                      ))}
+
+                    </ul>
+
+                  </>
+
+                )}
+
+              </article>
+
+            ))}
+
+          </div>
+
+        </div>
+
+      )}
 
       {/* Contribution Heatmap */}
 

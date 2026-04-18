@@ -105,6 +105,88 @@
   border-left: 4px solid var(--color-secondary);
 }
 
+.analysis-explainability-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.explanation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.explanation-strong {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.explanation-steady {
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.explanation-needs_attention {
+  border-color: rgba(245, 158, 11, 0.38);
+}
+
+.explanation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.explanation-title {
+  margin: 6px 0 0;
+  font-size: 1.1rem;
+  color: var(--color-on-surface);
+}
+
+.explanation-flags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.explanation-flag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-secondary-container);
+  color: var(--color-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.explanation-flag-muted {
+  background: var(--color-surface-container-high);
+  color: var(--color-on-surface-variant);
+}
+
+.explanation-summary {
+  margin: 0;
+  color: var(--color-on-surface-variant);
+  line-height: 1.6;
+}
+
+.explanation-subtitle {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-on-surface-variant);
+}
+
+.explanation-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-on-surface);
+}
+
+.explanation-list li + li {
+  margin-top: 8px;
+}
+
 /* ===== Export Grid ===== */
 .export-grid {
   display: grid;
